@@ -1,0 +1,19 @@
+{
+  "name": "@portfolio/web",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@portfolio/ai": "0.1.0",
+    "@portfolio/db": "0.1.0",
+    "@portfolio/finance-core": "0.1.0",
+    "@portfolio/plaid": "0.1.0",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

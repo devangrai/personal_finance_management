@@ -1,0 +1,14 @@
+{
+  "name": "@portfolio/sync-worker",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@portfolio/db": "0.1.0",
+    "@portfolio/plaid": "0.1.0"
+  }
+}

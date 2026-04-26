@@ -1,0 +1,9 @@
+{
+  "name": "@portfolio/finance-core",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  }
+}

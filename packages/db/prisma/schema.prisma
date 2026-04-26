@@ -1,0 +1,294 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PlaidEnvironment {
+  sandbox
+  development
+  production
+}
+
+enum PlaidItemStatus {
+  active
+  error
+  needs_reauth
+  disconnected
+}
+
+enum AccountType {
+  depository
+  credit
+  investment
+  loan
+  other
+}
+
+enum TransactionDirection {
+  debit
+  credit
+}
+
+enum TransactionReviewStatus {
+  uncategorized
+  auto_categorized
+  user_categorized
+  ignored
+}
+
+enum RuleMatchType {
+  merchant_name
+  transaction_name
+  plaid_category
+  account_name
+  exact
+  contains
+  regex
+}
+
+enum RecommendationType {
+  budget
+  emergency_fund
+  retirement
+  portfolio
+  tax
+  general
+}
+
+enum RecommendationRunStatus {
+  succeeded
+  failed
+  partial
+}
+
+enum RecurrenceFrequency {
+  weekly
+  biweekly
+  semimonthly
+  monthly
+  quarterly
+  annually
+  ad_hoc
+}
+
+enum HousingStatus {
+  rent_free
+  rent
+  mortgage
+  other
+}
+
+enum RiskTolerance {
+  conservative
+  moderate
+  aggressive
+  unknown
+}
+
+model User {
+  id                 String                @id @default(cuid())
+  email              String?               @unique
+  displayName        String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  profile            UserProfile?
+  plaidItems         PlaidItem[]
+  accounts           Account[]
+  categories         TransactionCategory[]
+  transactions       Transaction[]
+  transactionRules   TransactionRule[]
+  holdingSnapshots   HoldingSnapshot[]
+  investmentTxns     InvestmentTransaction[]
+  recommendationRuns RecommendationRun[]
+}
+
+model UserProfile {
+  id                             String              @id @default(cuid())
+  userId                         String              @unique
+  birthYear                      Int?
+  stateCode                      String?
+  housingStatus                  HousingStatus       @default(rent_free)
+  dependents                     Int                 @default(0)
+  annualIncomeCents              BigInt?
+  biweeklyNetPayCents            BigInt?
+  monthlyFixedExpenseCents       BigInt?
+  paycheckFrequency              RecurrenceFrequency?
+  currentEmergencyFundTargetCents BigInt?
+  targetRetirementSavingsRateBps Int?
+  riskTolerance                  RiskTolerance       @default(unknown)
+  notes                          String?
+  createdAt                      DateTime            @default(now())
+  updatedAt                      DateTime            @updatedAt
+  user                           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PlaidItem {
+  id                   String             @id @default(cuid())
+  userId               String
+  plaidItemId          String             @unique
+  plaidEnvironment     PlaidEnvironment   @default(sandbox)
+  institutionId        String?
+  institutionName      String?
+  accessTokenEncrypted String
+  status               PlaidItemStatus    @default(active)
+  transactionsCursor   String?
+  lastWebhookAt        DateTime?
+  lastSyncedAt         DateTime?
+  errorCode            String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts             Account[]
+}
+
+model Account {
+  id                String                  @id @default(cuid())
+  userId            String
+  plaidItemId       String
+  plaidAccountId    String                  @unique
+  name              String
+  officialName      String?
+  mask              String?
+  subtype           String?
+  type              AccountType
+  isoCurrencyCode   String?                 @default("USD")
+  currentBalance    Decimal?                @db.Decimal(18, 2)
+  availableBalance  Decimal?                @db.Decimal(18, 2)
+  isActive          Boolean                 @default(true)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plaidItem         PlaidItem               @relation(fields: [plaidItemId], references: [id], onDelete: Cascade)
+  transactions      Transaction[]
+  holdingSnapshots  HoldingSnapshot[]
+  investmentTxns    InvestmentTransaction[]
+
+  @@index([userId, type])
+}
+
+model TransactionCategory {
+  id         String            @id @default(cuid())
+  userId     String
+  key        String
+  label      String
+  parentKey  String?
+  isSystem   Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  rules      TransactionRule[]
+
+  @@unique([userId, key])
+}
+
+model Transaction {
+  id                        String                   @id @default(cuid())
+  userId                    String
+  accountId                 String
+  plaidTransactionId        String                   @unique
+  pendingTransactionId      String?
+  date                      DateTime
+  authorizedDate            DateTime?
+  name                      String
+  merchantName              String?
+  amount                    Decimal                  @db.Decimal(18, 2)
+  isoCurrencyCode           String?                  @default("USD")
+  direction                 TransactionDirection
+  isPending                 Boolean                  @default(false)
+  plaidCategory             Json?
+  personalFinanceCategory   String?
+  categoryId                String?
+  reviewStatus              TransactionReviewStatus  @default(uncategorized)
+  notes                     String?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  user                      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account                   Account                  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category                  TransactionCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+  @@index([accountId, date])
+  @@index([categoryId, date])
+}
+
+model TransactionRule {
+  id               String              @id @default(cuid())
+  userId           String
+  name             String
+  priority         Int                 @default(100)
+  isActive         Boolean             @default(true)
+  matchType        RuleMatchType
+  matchValue       String
+  categoryId       String
+  accountId        String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category         TransactionCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([userId, priority])
+}
+
+model HoldingSnapshot {
+  id                   String    @id @default(cuid())
+  userId               String
+  accountId            String
+  asOf                 DateTime
+  securityId           String?
+  symbol               String?
+  securityName         String
+  quantity             Decimal?  @db.Decimal(24, 8)
+  institutionPrice     Decimal?  @db.Decimal(18, 4)
+  institutionValue     Decimal?  @db.Decimal(18, 2)
+  costBasis            Decimal?  @db.Decimal(18, 2)
+  isoCurrencyCode      String?   @default("USD")
+  createdAt            DateTime  @default(now())
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account              Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, asOf])
+  @@index([accountId, asOf])
+}
+
+model InvestmentTransaction {
+  id                           String    @id @default(cuid())
+  userId                       String
+  accountId                    String
+  plaidInvestmentTransactionId String    @unique
+  securityId                   String?
+  symbol                       String?
+  name                         String
+  type                         String
+  subtype                      String?
+  amount                       Decimal   @db.Decimal(18, 2)
+  quantity                     Decimal?  @db.Decimal(24, 8)
+  price                        Decimal?  @db.Decimal(18, 4)
+  fees                         Decimal?  @db.Decimal(18, 2)
+  date                         DateTime
+  isoCurrencyCode              String?   @default("USD")
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
+  user                         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account                      Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@index([accountId, date])
+}
+
+model RecommendationRun {
+  id              String                  @id @default(cuid())
+  userId          String
+  type            RecommendationType
+  status          RecommendationRunStatus @default(succeeded)
+  inputSnapshot   Json
+  outputPayload   Json
+  createdAt       DateTime                @default(now())
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, createdAt])
+}

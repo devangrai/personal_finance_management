@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "allowJs": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@portfolio/db": [
+        "packages/db/src"
+      ],
+      "@portfolio/finance-core": [
+        "packages/finance-core/src"
+      ],
+      "@portfolio/plaid": [
+        "packages/plaid/src"
+      ],
+      "@portfolio/ai": [
+        "packages/ai/src"
+      ]
+    }
+  }
+}
