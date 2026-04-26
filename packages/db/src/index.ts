@@ -1,4 +1,9 @@
-import { PrismaClient } from "@prisma/client";
+import {
+  AccountType,
+  PlaidEnvironment,
+  PlaidItemStatus,
+  PrismaClient
+} from "@prisma/client";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -14,3 +19,5 @@ export const prisma =
 if (process.env.NODE_ENV !== "production") {
   globalThis.__portfolioPrisma__ = prisma;
 }
+
+export { AccountType, PlaidEnvironment, PlaidItemStatus };

@@ -65,6 +65,15 @@ workers/
 7. Run the initial migration with `npm run db:migrate`.
 8. Start the app with `npm run dev`.
 
+## Current Plaid flow
+
+The first backend slice supports:
+
+- `POST /api/plaid/link-token` to create a Plaid Link token
+- `POST /api/plaid/exchange-public-token` to exchange a public token and persist the Plaid Item plus linked accounts
+
+The current implementation assumes a single bootstrap user derived from `DEFAULT_USER_EMAIL`. That keeps Item and account persistence deterministic until application auth is added.
+
 ## GitHub setup
 
 Create an empty GitHub repository in your profile before the first push.

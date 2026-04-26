@@ -1,7 +1,25 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "jsx": "preserve",
+    "paths": {
+      "@portfolio/db": [
+        "../../packages/db/src"
+      ],
+      "@portfolio/finance-core": [
+        "../../packages/finance-core/src"
+      ],
+      "@portfolio/plaid": [
+        "../../packages/plaid/src"
+      ],
+      "@portfolio/ai": [
+        "../../packages/ai/src"
+      ],
+      "@/*": [
+        "./*"
+      ]
+    },
     "plugins": [
       {
         "name": "next"
