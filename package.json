@@ -11,11 +11,11 @@
     "workers/*"
   ],
   "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev --parallel",
-    "typecheck": "turbo run typecheck",
-    "db:generate": "npm run db:generate --workspace @portfolio/db",
-    "db:migrate": "npm run db:migrate --workspace @portfolio/db"
+    "build": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && turbo run build'",
+    "dev": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && turbo run dev --parallel'",
+    "typecheck": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && turbo run typecheck'",
+    "db:generate": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && npm run db:generate --workspace @portfolio/db'",
+    "db:migrate": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && npm run db:migrate --workspace @portfolio/db'"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

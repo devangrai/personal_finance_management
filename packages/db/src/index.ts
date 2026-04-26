@@ -2,6 +2,8 @@ import {
   AccountType,
   PlaidEnvironment,
   PlaidItemStatus,
+  TransactionDirection,
+  TransactionReviewStatus,
   PrismaClient
 } from "@prisma/client";
 
@@ -20,4 +22,10 @@ if (process.env.NODE_ENV !== "production") {
   globalThis.__portfolioPrisma__ = prisma;
 }
 
-export { AccountType, PlaidEnvironment, PlaidItemStatus };
+export {
+  AccountType,
+  PlaidEnvironment,
+  PlaidItemStatus,
+  TransactionDirection,
+  TransactionReviewStatus
+};

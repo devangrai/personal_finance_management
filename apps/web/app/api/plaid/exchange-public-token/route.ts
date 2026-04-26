@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { exchangePublicToken } from "@/lib/plaid";
 
 type ExchangePublicTokenPayload = {
@@ -45,14 +46,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unable to exchange public token.";
-
     return NextResponse.json(
       {
-        error: message
+        error: getErrorMessage(error, "Unable to exchange public token.")
       },
       {
         status: 500

@@ -1,3 +1,5 @@
+import { PlaidConnectionPanel } from "@/components/plaid-connection-panel";
+
 const layers = [
   {
     name: "Data ingestion",
@@ -55,6 +57,8 @@ export default function HomePage() {
           ))}
         </ul>
       </section>
+
+      <PlaidConnectionPanel />
     </main>
   );
 }

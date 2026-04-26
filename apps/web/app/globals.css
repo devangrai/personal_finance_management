@@ -81,6 +81,53 @@ body {
   font-size: 1.6rem;
 }
 
+.panelHeader,
+.accountsHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.panelCopy,
+.metaLine,
+.statusLine,
+.errorLine,
+.balanceLine,
+.orderedList {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.panelCopy {
+  margin: 0;
+}
+
+.metaLine,
+.statusLine,
+.errorLine,
+.balanceLine {
+  margin: 0.35rem 0 0;
+}
+
+.statusLine {
+  color: var(--ink);
+}
+
+.errorLine {
+  color: #a12626;
+}
+
+.gridWide {
+  margin-top: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.orderedList {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -106,9 +153,131 @@ body {
   line-height: 1.6;
 }
 
+.primaryButton,
+.secondaryButton {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.8rem 1.1rem;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease;
+}
+
+.primaryButton {
+  background: var(--accent);
+  color: #f8f4eb;
+}
+
+.secondaryButton {
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+}
+
+.buttonRow {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.primaryButton:hover,
+.secondaryButton:hover {
+  transform: translateY(-1px);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  transform: none;
+  opacity: 0.6;
+  cursor: default;
+}
+
 .list {
   margin: 0;
   padding-left: 1.25rem;
+}
+
+.accountsBlock {
+  margin-top: 1.5rem;
+}
+
+.transactionsBlock {
+  margin-top: 1.5rem;
+}
+
+.accountsHeader h3 {
+  margin: 0;
+}
+
+.accountsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.accountCard {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.accountCard h4 {
+  margin: 0.25rem 0 0;
+  font-size: 1.1rem;
+}
+
+.balanceLine {
+  color: var(--ink);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.tableWrap {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.transactionsTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.transactionsTable th,
+.transactionsTable td {
+  padding: 0.85rem 0.75rem;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.transactionsTable th {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.tablePrimary {
+  color: var(--ink);
+}
+
+.tableSecondary {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.amountPositive {
+  color: #0f766e;
+  font-weight: 700;
+}
+
+.amountNegative {
+  color: var(--ink);
+  font-weight: 700;
 }
 
 @media (max-width: 640px) {
@@ -119,5 +288,10 @@ body {
 
   .panel {
     padding: 1.1rem;
+  }
+
+  .panelHeader,
+  .accountsHeader {
+    flex-direction: column;
   }
 }

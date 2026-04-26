@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { createLinkToken } from "@/lib/plaid";
 
 export async function POST() {
@@ -10,12 +11,9 @@ export async function POST() {
       expiration: response.expiration
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unable to create Plaid link token.";
-
     return NextResponse.json(
       {
-        error: message
+        error: getErrorMessage(error, "Unable to create Plaid link token.")
       },
       {
         status: 500

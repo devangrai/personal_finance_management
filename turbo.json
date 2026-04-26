@@ -1,5 +1,23 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": [
+    "DATABASE_URL",
+    "PLAID_CLIENT_ID",
+    "PLAID_SECRET",
+    "PLAID_SANDBOX_SECRET",
+    "PLAID_DEVELOPMENT_SECRET",
+    "PLAID_PRODUCTION_SECRET",
+    "PLAID_ENV",
+    "PLAID_CLIENT_NAME",
+    "PLAID_COUNTRY_CODES",
+    "PLAID_PRODUCTS",
+    "PLAID_REDIRECT_URI",
+    "NEXT_PUBLIC_APP_URL",
+    "ENCRYPTION_KEY",
+    "DEFAULT_USER_EMAIL",
+    "CRON_SECRET",
+    "OPENAI_API_KEY"
+  ],
   "tasks": {
     "build": {
       "dependsOn": [

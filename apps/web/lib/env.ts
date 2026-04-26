@@ -1,3 +1,5 @@
+import path from "node:path";
+import { loadEnvConfig } from "@next/env";
 import {
   type CountryCode,
   type Products
@@ -7,6 +9,8 @@ import {
   parsePlaidCountryCodes,
   parsePlaidProducts
 } from "@portfolio/plaid";
+
+loadEnvConfig(path.resolve(process.cwd(), "../.."));
 
 type AppEnv = {
   appUrl: string;
@@ -41,6 +45,17 @@ function optionalEnv(name: string) {
   return value ? value : undefined;
 }
 
+function resolvePlaidSecret(plaidEnv: PlaidEnvironmentName) {
+  const envSpecificSecretName =
+    plaidEnv === "sandbox"
+      ? "PLAID_SANDBOX_SECRET"
+      : plaidEnv === "development"
+        ? "PLAID_DEVELOPMENT_SECRET"
+        : "PLAID_PRODUCTION_SECRET";
+
+  return optionalEnv(envSpecificSecretName) ?? requireEnv("PLAID_SECRET");
+}
+
 export function getAppEnv(): AppEnv {
   const plaidEnvValue = requireEnv("PLAID_ENV");
   if (!supportedPlaidEnvironments.has(plaidEnvValue as PlaidEnvironmentName)) {
@@ -55,7 +70,7 @@ export function getAppEnv(): AppEnv {
   return {
     appUrl,
     plaidClientId: requireEnv("PLAID_CLIENT_ID"),
-    plaidSecret: requireEnv("PLAID_SECRET"),
+    plaidSecret: resolvePlaidSecret(plaidEnvValue as PlaidEnvironmentName),
     plaidEnv: plaidEnvValue as PlaidEnvironmentName,
     plaidClientName:
       optionalEnv("PLAID_CLIENT_NAME") ?? "Personal Finance Management",
