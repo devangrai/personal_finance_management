@@ -113,6 +113,25 @@ type CreateRuleResponse = {
   };
 };
 
+type RecurringCandidate = {
+  averageAmount: string;
+  categoryLabel: string | null;
+  confidenceScore: number;
+  direction: "credit" | "debit";
+  displayName: string;
+  frequency: "weekly" | "biweekly" | "monthly" | "quarterly" | "unknown";
+  latestAmount: string;
+  lastDate: string;
+  nextExpectedDate: string | null;
+  occurrenceCount: number;
+  reviewState: string;
+};
+
+type RecurringSummaryResponse = {
+  inflows: RecurringCandidate[];
+  outflows: RecurringCandidate[];
+};
+
 const plaidSetupSteps = [
   "Create a free Plaid developer account and open the Dashboard.",
   "Copy your Sandbox client_id and secret into the app .env file.",
@@ -158,22 +177,53 @@ function formatCurrency(value: string) {
   }).format(Number(value));
 }
 
+function formatFrequency(value: RecurringCandidate["frequency"]) {
+  switch (value) {
+    case "biweekly":
+      return "Biweekly";
+    case "monthly":
+      return "Monthly";
+    case "quarterly":
+      return "Quarterly";
+    case "weekly":
+      return "Weekly";
+    default:
+      return "Irregular";
+  }
+}
+
+function formatShortDate(value: string | null) {
+  if (!value) {
+    return "Unknown";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC"
+  }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
 export function PlaidConnectionPanel() {
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
   const [cashflowSummary, setCashflowSummary] =
     useState<CashflowSummaryResponse | null>(null);
+  const [recurringSummary, setRecurringSummary] =
+    useState<RecurringSummaryResponse | null>(null);
   const [userEmail, setUserEmail] = useState<string>("owner@example.com");
   const [accountsError, setAccountsError] = useState<string | null>(null);
   const [transactionsError, setTransactionsError] = useState<string | null>(null);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [cashflowError, setCashflowError] = useState<string | null>(null);
+  const [recurringError, setRecurringError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [isLoadingCashflow, setIsLoadingCashflow] = useState(true);
+  const [isLoadingRecurring, setIsLoadingRecurring] = useState(true);
   const [isCreatingLinkToken, setIsCreatingLinkToken] = useState(false);
   const [isSyncingTransactions, setIsSyncingTransactions] = useState(false);
   const [savingTransactionId, setSavingTransactionId] = useState<string | null>(null);
@@ -284,11 +334,38 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  async function refreshRecurringSummary() {
+    setIsLoadingRecurring(true);
+    setRecurringError(null);
+
+    try {
+      const response = await fetch("/api/recurring/summary", {
+        method: "GET"
+      });
+      const payload = (await response.json()) as RecurringSummaryResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to load recurring summary.");
+      }
+
+      setRecurringSummary(payload);
+    } catch (error) {
+      setRecurringError(
+        error instanceof Error ? error.message : "Unable to load recurring summary."
+      );
+    } finally {
+      setIsLoadingRecurring(false);
+    }
+  }
+
   useEffect(() => {
     void refreshAccounts();
     void refreshTransactions();
     void refreshCategories();
     void refreshCashflowSummary();
+    void refreshRecurringSummary();
   }, []);
 
   const plaidConfig = useMemo(
@@ -320,6 +397,7 @@ export function PlaidConnectionPanel() {
           await refreshAccounts();
           await refreshTransactions();
           await refreshCashflowSummary();
+          await refreshRecurringSummary();
           setStatusMessage("Linked account saved successfully.");
           setLinkToken(null);
         } catch (error) {
@@ -404,6 +482,7 @@ export function PlaidConnectionPanel() {
 
       await Promise.all([refreshAccounts(), refreshTransactions()]);
       await refreshCashflowSummary();
+      await refreshRecurringSummary();
       setStatusMessage(
         `Transactions synced. Added ${payload.totalAdded ?? 0}, modified ${payload.totalModified ?? 0}, removed ${payload.totalRemoved ?? 0}.`
       );
@@ -479,6 +558,7 @@ export function PlaidConnectionPanel() {
 
       await refreshTransactions();
       await refreshCashflowSummary();
+      await refreshRecurringSummary();
       setStatusMessage(
         payload.existed
           ? `Rule already existed. Reapplied to ${payload.appliedCount} matching transactions.`
@@ -655,6 +735,70 @@ export function PlaidConnectionPanel() {
               </article>
             </div>
           </>
+        )}
+      </div>
+
+      <div className="recurringBlock">
+        <div className="accountsHeader">
+          <div>
+            <h3>Recurring cash flow</h3>
+            <p className="panelCopy">
+              Repeated inflows and outflows are inferred from cadence and amount
+              stability so you can spot payroll, subscriptions, and likely bills.
+            </p>
+          </div>
+          <button
+            className="secondaryButton"
+            onClick={() => void refreshRecurringSummary()}
+            type="button"
+          >
+            Refresh recurring
+          </button>
+        </div>
+
+        {isLoadingRecurring ? (
+          <p className="panelCopy">Loading recurring transactions...</p>
+        ) : recurringError ? (
+          <p className="errorLine">{recurringError}</p>
+        ) : (
+          <div className="grid gridWide recurringGrid">
+            <article className="card">
+              <h3>Likely recurring inflows</h3>
+              {!recurringSummary || recurringSummary.inflows.length === 0 ? (
+                <p className="panelCopy">No recurring inflows detected yet.</p>
+              ) : (
+                <ul className="list tightList">
+                  {recurringSummary.inflows.map((candidate) => (
+                    <li key={`${candidate.direction}-${candidate.displayName}`}>
+                      <strong>{candidate.displayName}</strong>:{" "}
+                      {formatFrequency(candidate.frequency)} ·{" "}
+                      {formatCurrency(candidate.averageAmount)} average · next{" "}
+                      {formatShortDate(candidate.nextExpectedDate)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+
+            <article className="card">
+              <h3>Likely recurring outflows</h3>
+              {!recurringSummary || recurringSummary.outflows.length === 0 ? (
+                <p className="panelCopy">No recurring outflows detected yet.</p>
+              ) : (
+                <ul className="list tightList">
+                  {recurringSummary.outflows.map((candidate) => (
+                    <li key={`${candidate.direction}-${candidate.displayName}`}>
+                      <strong>{candidate.displayName}</strong>:{" "}
+                      {formatFrequency(candidate.frequency)} ·{" "}
+                      {formatCurrency(candidate.averageAmount)} average · next{" "}
+                      {formatShortDate(candidate.nextExpectedDate)}
+                      {candidate.categoryLabel ? ` · ${candidate.categoryLabel}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+          </div>
         )}
       </div>
 

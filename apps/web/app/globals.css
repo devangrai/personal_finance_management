@@ -207,6 +207,10 @@ body {
   margin-top: 1.5rem;
 }
 
+.recurringBlock {
+  margin-top: 1.5rem;
+}
+
 .transactionsBlock {
   margin-top: 1.5rem;
 }
@@ -352,6 +356,10 @@ body {
 }
 
 .cashflowInsights {
+  margin-top: 1rem;
+}
+
+.recurringGrid {
   margin-top: 1rem;
 }
 
