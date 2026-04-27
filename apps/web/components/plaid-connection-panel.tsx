@@ -80,6 +80,30 @@ type CategoriesResponse = {
   categories: TransactionCategory[];
 };
 
+type CashflowSummaryMonth = {
+  month: string;
+  label: string;
+  income: string;
+  spending: string;
+  transfers: string;
+  netCashflow: string;
+  uncategorizedOutflow: string;
+  reviewedTransactionCount: number;
+  uncategorizedTransactionCount: number;
+  reviewedSpendRatioBps: number;
+  topCategories: Array<{
+    key: string;
+    label: string;
+    amount: string;
+    shareBps: number;
+  }>;
+};
+
+type CashflowSummaryResponse = {
+  latestMonth: CashflowSummaryMonth | null;
+  months: CashflowSummaryMonth[];
+};
+
 type CreateRuleResponse = {
   existed: boolean;
   appliedCount: number;
@@ -127,18 +151,29 @@ function formatTransactionDate(value: string) {
   }).format(new Date(value));
 }
 
+function formatCurrency(value: string) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD"
+  }).format(Number(value));
+}
+
 export function PlaidConnectionPanel() {
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
+  const [cashflowSummary, setCashflowSummary] =
+    useState<CashflowSummaryResponse | null>(null);
   const [userEmail, setUserEmail] = useState<string>("owner@example.com");
   const [accountsError, setAccountsError] = useState<string | null>(null);
   const [transactionsError, setTransactionsError] = useState<string | null>(null);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [cashflowError, setCashflowError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+  const [isLoadingCashflow, setIsLoadingCashflow] = useState(true);
   const [isCreatingLinkToken, setIsCreatingLinkToken] = useState(false);
   const [isSyncingTransactions, setIsSyncingTransactions] = useState(false);
   const [savingTransactionId, setSavingTransactionId] = useState<string | null>(null);
@@ -223,10 +258,37 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  async function refreshCashflowSummary() {
+    setIsLoadingCashflow(true);
+    setCashflowError(null);
+
+    try {
+      const response = await fetch("/api/cashflow/summary?months=6", {
+        method: "GET"
+      });
+      const payload = (await response.json()) as CashflowSummaryResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to load cash flow summary.");
+      }
+
+      setCashflowSummary(payload);
+    } catch (error) {
+      setCashflowError(
+        error instanceof Error ? error.message : "Unable to load cash flow summary."
+      );
+    } finally {
+      setIsLoadingCashflow(false);
+    }
+  }
+
   useEffect(() => {
     void refreshAccounts();
     void refreshTransactions();
     void refreshCategories();
+    void refreshCashflowSummary();
   }, []);
 
   const plaidConfig = useMemo(
@@ -257,6 +319,7 @@ export function PlaidConnectionPanel() {
 
           await refreshAccounts();
           await refreshTransactions();
+          await refreshCashflowSummary();
           setStatusMessage("Linked account saved successfully.");
           setLinkToken(null);
         } catch (error) {
@@ -340,6 +403,7 @@ export function PlaidConnectionPanel() {
       }
 
       await Promise.all([refreshAccounts(), refreshTransactions()]);
+      await refreshCashflowSummary();
       setStatusMessage(
         `Transactions synced. Added ${payload.totalAdded ?? 0}, modified ${payload.totalModified ?? 0}, removed ${payload.totalRemoved ?? 0}.`
       );
@@ -414,6 +478,7 @@ export function PlaidConnectionPanel() {
       }
 
       await refreshTransactions();
+      await refreshCashflowSummary();
       setStatusMessage(
         payload.existed
           ? `Rule already existed. Reapplied to ${payload.appliedCount} matching transactions.`
@@ -469,6 +534,128 @@ export function PlaidConnectionPanel() {
             Link ready: {ready ? "yes" : linkToken ? "loading" : "not started"}
           </p>
         </article>
+      </div>
+
+      <div className="cashflowBlock">
+        <div className="accountsHeader">
+          <div>
+            <h3>Monthly cash flow</h3>
+            <p className="panelCopy">
+              Reviewed and auto-categorized transactions are rolled into a monthly
+              readout. Uncategorized outflow stays separate so the numbers remain
+              honest.
+            </p>
+          </div>
+          <button
+            className="secondaryButton"
+            onClick={() => void refreshCashflowSummary()}
+            type="button"
+          >
+            Refresh summary
+          </button>
+        </div>
+
+        {isLoadingCashflow ? (
+          <p className="panelCopy">Loading cash flow summary...</p>
+        ) : cashflowError ? (
+          <p className="errorLine">{cashflowError}</p>
+        ) : !cashflowSummary?.latestMonth ? (
+          <p className="panelCopy">
+            Cash flow summary appears after you categorize or auto-categorize
+            some transactions.
+          </p>
+        ) : (
+          <>
+            <div className="summaryGrid">
+              <article className="summaryCard">
+                <p className="summaryLabel">Current month income</p>
+                <p className="summaryValue">
+                  {formatCurrency(cashflowSummary.latestMonth.income)}
+                </p>
+                <p className="summaryMeta">{cashflowSummary.latestMonth.label}</p>
+              </article>
+              <article className="summaryCard">
+                <p className="summaryLabel">Current month spending</p>
+                <p className="summaryValue">
+                  {formatCurrency(cashflowSummary.latestMonth.spending)}
+                </p>
+                <p className="summaryMeta">
+                  Uncategorized outflow:{" "}
+                  {formatCurrency(cashflowSummary.latestMonth.uncategorizedOutflow)}
+                </p>
+              </article>
+              <article className="summaryCard">
+                <p className="summaryLabel">Net cash flow</p>
+                <p className="summaryValue">
+                  {formatCurrency(cashflowSummary.latestMonth.netCashflow)}
+                </p>
+                <p className="summaryMeta">
+                  Transfers tracked separately:{" "}
+                  {formatCurrency(cashflowSummary.latestMonth.transfers)}
+                </p>
+              </article>
+              <article className="summaryCard">
+                <p className="summaryLabel">Reviewed coverage</p>
+                <p className="summaryValue">
+                  {(cashflowSummary.latestMonth.reviewedSpendRatioBps / 100).toFixed(0)}%
+                </p>
+                <p className="summaryMeta">
+                  {cashflowSummary.latestMonth.reviewedTransactionCount} reviewed,
+                  {" "}
+                  {cashflowSummary.latestMonth.uncategorizedTransactionCount} uncategorized
+                </p>
+              </article>
+            </div>
+
+            <div className="grid gridWide cashflowInsights">
+              <article className="card">
+                <h3>Top reviewed spending categories</h3>
+                {cashflowSummary.latestMonth.topCategories.length === 0 ? (
+                  <p className="panelCopy">
+                    No reviewed spending categories yet for {cashflowSummary.latestMonth.label}.
+                  </p>
+                ) : (
+                  <ul className="list tightList">
+                    {cashflowSummary.latestMonth.topCategories.map((category) => (
+                      <li key={category.key}>
+                        {category.label}: {formatCurrency(category.amount)} (
+                        {(category.shareBps / 100).toFixed(0)}%)
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </article>
+
+              <article className="card">
+                <h3>Six-month view</h3>
+                <div className="tableWrap compactTableWrap">
+                  <table className="summaryTable">
+                    <thead>
+                      <tr>
+                        <th>Month</th>
+                        <th>Income</th>
+                        <th>Spend</th>
+                        <th>Net</th>
+                        <th>Coverage</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cashflowSummary.months.map((month) => (
+                        <tr key={month.month}>
+                          <td>{month.label}</td>
+                          <td>{formatCurrency(month.income)}</td>
+                          <td>{formatCurrency(month.spending)}</td>
+                          <td>{formatCurrency(month.netCashflow)}</td>
+                          <td>{(month.reviewedSpendRatioBps / 100).toFixed(0)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="accountsBlock">

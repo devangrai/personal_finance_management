@@ -203,6 +203,10 @@ body {
   margin-top: 1.5rem;
 }
 
+.cashflowBlock {
+  margin-top: 1.5rem;
+}
+
 .transactionsBlock {
   margin-top: 1.5rem;
 }
@@ -318,6 +322,57 @@ body {
 .amountNegative {
   color: var(--ink);
   font-weight: 700;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.summaryCard {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.summaryLabel,
+.summaryMeta {
+  margin: 0;
+  color: var(--muted);
+}
+
+.summaryValue {
+  margin: 0.5rem 0 0.35rem;
+  color: var(--ink);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.cashflowInsights {
+  margin-top: 1rem;
+}
+
+.tightList {
+  margin-top: 0.5rem;
+}
+
+.compactTableWrap {
+  margin-top: 0.5rem;
+}
+
+.summaryTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.summaryTable th,
+.summaryTable td {
+  padding: 0.65rem 0.5rem;
+  border-top: 1px solid var(--line);
+  text-align: left;
 }
 
 @media (max-width: 640px) {
