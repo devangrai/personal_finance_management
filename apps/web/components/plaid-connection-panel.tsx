@@ -47,6 +47,11 @@ type RecentTransaction = {
   isPending: boolean;
   personalFinanceCategory: string | null;
   reviewStatus: string;
+  category: {
+    id: string;
+    key: string;
+    label: string;
+  } | null;
   account: {
     id: string;
     name: string;
@@ -61,6 +66,18 @@ type RecentTransaction = {
 
 type TransactionsResponse = {
   transactions: RecentTransaction[];
+};
+
+type TransactionCategory = {
+  id: string;
+  key: string;
+  label: string;
+  parentKey: string | null;
+  isSystem: boolean;
+};
+
+type CategoriesResponse = {
+  categories: TransactionCategory[];
 };
 
 const plaidSetupSteps = [
@@ -104,15 +121,18 @@ function formatTransactionDate(value: string) {
 export function PlaidConnectionPanel() {
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
+  const [categories, setCategories] = useState<TransactionCategory[]>([]);
   const [userEmail, setUserEmail] = useState<string>("owner@example.com");
   const [accountsError, setAccountsError] = useState<string | null>(null);
   const [transactionsError, setTransactionsError] = useState<string | null>(null);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [isCreatingLinkToken, setIsCreatingLinkToken] = useState(false);
   const [isSyncingTransactions, setIsSyncingTransactions] = useState(false);
+  const [savingTransactionId, setSavingTransactionId] = useState<string | null>(null);
   const [pendingOpen, setPendingOpen] = useState(false);
 
   async function refreshAccounts() {
@@ -168,9 +188,33 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  async function refreshCategories() {
+    setCategoriesError(null);
+
+    try {
+      const response = await fetch("/api/categories", {
+        method: "GET"
+      });
+      const payload = (await response.json()) as CategoriesResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to load categories.");
+      }
+
+      setCategories(payload.categories);
+    } catch (error) {
+      setCategoriesError(
+        error instanceof Error ? error.message : "Unable to load categories."
+      );
+    }
+  }
+
   useEffect(() => {
     void refreshAccounts();
     void refreshTransactions();
+    void refreshCategories();
   }, []);
 
   const plaidConfig = useMemo(
@@ -296,6 +340,52 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  async function handleCategoryChange(
+    transactionId: string,
+    categoryId: string | null
+  ) {
+    setSavingTransactionId(transactionId);
+
+    try {
+      const response = await fetch(`/api/transactions/${transactionId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          categoryId
+        })
+      });
+
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to update transaction category.");
+      }
+
+      setTransactions((currentTransactions) =>
+        currentTransactions.map((transaction) =>
+          transaction.id === transactionId
+            ? {
+                ...transaction,
+                category:
+                  categories.find((category) => category.id === categoryId) ?? null,
+                reviewStatus: categoryId ? "user_categorized" : "uncategorized"
+              }
+            : transaction
+        )
+      );
+      setStatusMessage("Transaction category updated.");
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to update transaction category."
+      );
+    } finally {
+      setSavingTransactionId(null);
+    }
+  }
+
   return (
     <section className="panel">
       <div className="panelHeader">
@@ -416,6 +506,9 @@ export function PlaidConnectionPanel() {
           </p>
         ) : (
           <div className="tableWrap">
+            {categoriesError ? (
+              <p className="errorLine">{categoriesError}</p>
+            ) : null}
             <table className="transactionsTable">
               <thead>
                 <tr>
@@ -449,6 +542,28 @@ export function PlaidConnectionPanel() {
                       </div>
                     </td>
                     <td>{transaction.personalFinanceCategory ?? "Uncategorized"}</td>
+                    <td>
+                      <select
+                        className="categorySelect"
+                        disabled={savingTransactionId === transaction.id}
+                        onChange={(event) =>
+                          void handleCategoryChange(
+                            transaction.id,
+                            event.target.value || null
+                          )
+                        }
+                        value={transaction.category?.id ?? ""}
+                      >
+                        <option value="">No review category</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.parentKey
+                              ? `${category.parentKey} / ${category.label}`
+                              : category.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td>{transaction.isPending ? "Pending" : "Posted"}</td>
                     <td
                       className={

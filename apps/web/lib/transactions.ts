@@ -1,25 +1,14 @@
 import { prisma } from "@portfolio/db";
+import { ensureDefaultCategories, getDefaultUserId } from "./categories";
 import { getAppEnv } from "./env";
 
 export async function listRecentTransactions(limit = 50) {
-  const { defaultUserEmail } = getAppEnv();
-
-  const user = await prisma.user.findUnique({
-    where: {
-      email: defaultUserEmail
-    },
-    select: {
-      id: true
-    }
-  });
-
-  if (!user) {
-    return [];
-  }
+  const userId = await getDefaultUserId();
+  await ensureDefaultCategories(userId);
 
   return prisma.transaction.findMany({
     where: {
-      userId: user.id
+      userId
     },
     orderBy: [
       {
@@ -42,6 +31,13 @@ export async function listRecentTransactions(limit = 50) {
       isPending: true,
       personalFinanceCategory: true,
       reviewStatus: true,
+      category: {
+        select: {
+          id: true,
+          key: true,
+          label: true
+        }
+      },
       account: {
         select: {
           id: true,

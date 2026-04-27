@@ -255,6 +255,17 @@ body {
   vertical-align: top;
 }
 
+.categorySelect {
+  width: 100%;
+  min-width: 180px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 0.45rem 0.6rem;
+  font: inherit;
+  color: var(--ink);
+}
+
 .transactionsTable th {
   color: var(--muted);
   font-size: 0.9rem;
