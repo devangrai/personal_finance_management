@@ -80,6 +80,15 @@ type CategoriesResponse = {
   categories: TransactionCategory[];
 };
 
+type CreateRuleResponse = {
+  existed: boolean;
+  appliedCount: number;
+  rule: {
+    id: string;
+    name: string;
+  };
+};
+
 const plaidSetupSteps = [
   "Create a free Plaid developer account and open the Dashboard.",
   "Copy your Sandbox client_id and secret into the app .env file.",
@@ -133,6 +142,9 @@ export function PlaidConnectionPanel() {
   const [isCreatingLinkToken, setIsCreatingLinkToken] = useState(false);
   const [isSyncingTransactions, setIsSyncingTransactions] = useState(false);
   const [savingTransactionId, setSavingTransactionId] = useState<string | null>(null);
+  const [creatingRuleTransactionId, setCreatingRuleTransactionId] = useState<
+    string | null
+  >(null);
   const [pendingOpen, setPendingOpen] = useState(false);
 
   async function refreshAccounts() {
@@ -386,6 +398,36 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  async function handleCreateRule(transactionId: string) {
+    setCreatingRuleTransactionId(transactionId);
+
+    try {
+      const response = await fetch(`/api/transactions/${transactionId}/rule`, {
+        method: "POST"
+      });
+      const payload = (await response.json()) as CreateRuleResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to create transaction rule.");
+      }
+
+      await refreshTransactions();
+      setStatusMessage(
+        payload.existed
+          ? `Rule already existed. Reapplied to ${payload.appliedCount} matching transactions.`
+          : `Rule created and applied to ${payload.appliedCount} matching transactions.`
+      );
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "Unable to create transaction rule."
+      );
+    } finally {
+      setCreatingRuleTransactionId(null);
+    }
+  }
+
   return (
     <section className="panel">
       <div className="panelHeader">
@@ -515,8 +557,10 @@ export function PlaidConnectionPanel() {
                   <th>Date</th>
                   <th>Description</th>
                   <th>Account</th>
-                  <th>Category</th>
-                  <th>Status</th>
+                  <th>Plaid category</th>
+                  <th>Review category</th>
+                  <th>Rule</th>
+                  <th>State</th>
                   <th>Amount</th>
                 </tr>
               </thead>
@@ -543,26 +587,54 @@ export function PlaidConnectionPanel() {
                     </td>
                     <td>{transaction.personalFinanceCategory ?? "Uncategorized"}</td>
                     <td>
-                      <select
-                        className="categorySelect"
-                        disabled={savingTransactionId === transaction.id}
-                        onChange={(event) =>
-                          void handleCategoryChange(
-                            transaction.id,
-                            event.target.value || null
-                          )
+                      <div className="cellStack">
+                        <select
+                          className="categorySelect"
+                          disabled={
+                            savingTransactionId === transaction.id ||
+                            creatingRuleTransactionId === transaction.id
+                          }
+                          onChange={(event) =>
+                            void handleCategoryChange(
+                              transaction.id,
+                              event.target.value || null
+                            )
+                          }
+                          value={transaction.category?.id ?? ""}
+                        >
+                          <option value="">No review category</option>
+                          {categories.map((category) => (
+                            <option key={category.id} value={category.id}>
+                              {category.parentKey
+                                ? `${category.parentKey} / ${category.label}`
+                                : category.label}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="tableSecondary">
+                          {transaction.reviewStatus === "auto_categorized"
+                            ? "Auto-categorized"
+                            : transaction.reviewStatus === "user_categorized"
+                              ? "Reviewed manually"
+                              : "Needs review"}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <button
+                        className="inlineActionButton"
+                        disabled={
+                          !transaction.category ||
+                          savingTransactionId === transaction.id ||
+                          creatingRuleTransactionId === transaction.id
                         }
-                        value={transaction.category?.id ?? ""}
+                        onClick={() => void handleCreateRule(transaction.id)}
+                        type="button"
                       >
-                        <option value="">No review category</option>
-                        {categories.map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.parentKey
-                              ? `${category.parentKey} / ${category.label}`
-                              : category.label}
-                          </option>
-                        ))}
-                      </select>
+                        {creatingRuleTransactionId === transaction.id
+                          ? "Saving rule..."
+                          : "Save rule"}
+                      </button>
                     </td>
                     <td>{transaction.isPending ? "Pending" : "Posted"}</td>
                     <td

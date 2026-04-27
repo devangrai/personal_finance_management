@@ -13,6 +13,7 @@
   "scripts": {
     "build": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && turbo run build'",
     "dev": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && turbo run dev --parallel'",
+    "dev:web": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && export PORT=${PORT:-3001} && set -a && [ -f .env ] && source .env && set +a && npm run dev --workspace @portfolio/web'",
     "typecheck": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && turbo run typecheck'",
     "db:generate": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && npm run db:generate --workspace @portfolio/db'",
     "db:migrate": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && npm run db:migrate --workspace @portfolio/db'"

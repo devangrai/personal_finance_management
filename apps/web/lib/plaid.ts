@@ -18,6 +18,10 @@ import {
 import { createPlaidClient } from "@portfolio/plaid";
 import { decryptString, encryptString } from "./crypto";
 import { getAppEnv } from "./env";
+import {
+  findMatchingTransactionRule,
+  getActiveTransactionRules
+} from "./transaction-rules";
 import { getOrCreateDefaultUser } from "./user";
 
 type ExchangePublicTokenInput = {
@@ -275,7 +279,8 @@ export async function listPersistedPlaidItems() {
         },
         select: {
           id: true,
-          plaidAccountId: true
+          plaidAccountId: true,
+          name: true
         }
       }
     },
@@ -326,11 +331,37 @@ function normalizePlaidCategory(transaction: PlaidTransaction) {
 
 async function upsertTransactionsForItem(
   plaidItem: PlaidItemWithAccounts,
-  transactions: PlaidTransaction[]
+  transactions: PlaidTransaction[],
+  activeRules: Awaited<ReturnType<typeof getActiveTransactionRules>>
 ) {
-  const user = await getOrCreateDefaultUser();
+  if (transactions.length === 0) {
+    return;
+  }
+
   const accountIdByPlaidAccountId = new Map(
     plaidItem.accounts.map((account) => [account.plaidAccountId, account.id])
+  );
+  const accountNameByPlaidAccountId = new Map(
+    plaidItem.accounts.map((account) => [account.plaidAccountId, account.name])
+  );
+  const existingTransactions = await prisma.transaction.findMany({
+    where: {
+      plaidTransactionId: {
+        in: transactions.map((transaction) => transaction.transaction_id)
+      }
+    },
+    select: {
+      id: true,
+      plaidTransactionId: true,
+      categoryId: true,
+      reviewStatus: true
+    }
+  });
+  const existingTransactionByPlaidId = new Map(
+    existingTransactions.map((transaction) => [
+      transaction.plaidTransactionId,
+      transaction
+    ])
   );
 
   await Promise.all(
@@ -349,69 +380,76 @@ async function upsertTransactionsForItem(
         );
       }
 
-      return prisma.transaction.upsert({
-        where: {
+      const existingTransaction = existingTransactionByPlaidId.get(
+        transaction.transaction_id
+      );
+      const matchedRule = findMatchingTransactionRule(activeRules, {
+        accountId,
+        accountName:
+          accountNameByPlaidAccountId.get(transaction.account_id) ?? null,
+        merchantName: transaction.merchant_name ?? null,
+        personalFinanceCategory:
+          transaction.personal_finance_category?.detailed ?? null,
+        transactionName: transaction.name
+      });
+      const categorization =
+        existingTransaction?.reviewStatus === TransactionReviewStatus.user_categorized ||
+        existingTransaction?.reviewStatus === TransactionReviewStatus.ignored
+          ? {
+              categoryId: existingTransaction.categoryId,
+              reviewStatus: existingTransaction.reviewStatus
+            }
+          : matchedRule
+            ? {
+                categoryId: matchedRule.categoryId,
+                reviewStatus: TransactionReviewStatus.auto_categorized
+              }
+            : {
+                categoryId: null,
+                reviewStatus: TransactionReviewStatus.uncategorized
+              };
+      const transactionData = {
+        userId: plaidItem.userId,
+        accountId,
+        pendingTransactionId: transaction.pending_transaction_id ?? null,
+        date,
+        authorizedDate: parseTransactionDate(transaction.authorized_date),
+        name: transaction.name,
+        merchantName: transaction.merchant_name ?? null,
+        amount: normalizeTransactionAmount(transaction.amount),
+        isoCurrencyCode:
+          transaction.iso_currency_code ?? transaction.unofficial_currency_code,
+        direction: mapTransactionDirection(transaction.amount),
+        isPending: transaction.pending,
+        plaidCategory: normalizePlaidCategory(transaction),
+        personalFinanceCategory:
+          transaction.personal_finance_category?.detailed ?? null,
+        ...categorization
+      };
+
+      if (existingTransaction) {
+        return prisma.transaction.update({
+          where: {
+            id: existingTransaction.id
+          },
+          data: transactionData
+        });
+      }
+
+      return prisma.transaction.create({
+        data: {
+          ...transactionData,
           plaidTransactionId: transaction.transaction_id
-        },
-        update: {
-          userId: user.id,
-          accountId,
-          pendingTransactionId: transaction.pending_transaction_id ?? null,
-          date,
-          authorizedDate: parseTransactionDate(transaction.authorized_date),
-          name: transaction.name,
-          merchantName: transaction.merchant_name ?? null,
-          amount: normalizeTransactionAmount(transaction.amount),
-          isoCurrencyCode:
-            transaction.iso_currency_code ?? transaction.unofficial_currency_code,
-          direction: mapTransactionDirection(transaction.amount),
-          isPending: transaction.pending,
-          plaidCategory: normalizePlaidCategory(transaction),
-          personalFinanceCategory:
-            transaction.personal_finance_category?.detailed ?? null,
-          reviewStatus: TransactionReviewStatus.uncategorized
-        },
-        create: {
-          userId: user.id,
-          accountId,
-          plaidTransactionId: transaction.transaction_id,
-          pendingTransactionId: transaction.pending_transaction_id ?? null,
-          date,
-          authorizedDate: parseTransactionDate(transaction.authorized_date),
-          name: transaction.name,
-          merchantName: transaction.merchant_name ?? null,
-          amount: normalizeTransactionAmount(transaction.amount),
-          isoCurrencyCode:
-            transaction.iso_currency_code ?? transaction.unofficial_currency_code,
-          direction: mapTransactionDirection(transaction.amount),
-          isPending: transaction.pending,
-          plaidCategory: normalizePlaidCategory(transaction),
-          personalFinanceCategory:
-            transaction.personal_finance_category?.detailed ?? null,
-          reviewStatus: TransactionReviewStatus.uncategorized
         }
       });
     })
   );
 }
 
-async function removeTransactions(removedTransactions: RemovedTransaction[]) {
-  if (removedTransactions.length === 0) {
-    return 0;
-  }
-
-  const response = await prisma.transaction.deleteMany({
-    where: {
-      plaidTransactionId: {
-        in: removedTransactions.map((transaction) => transaction.transaction_id)
-      }
-    }
-  });
-
-  return response.count;
-}
-
-async function syncSinglePlaidItem(plaidItem: PlaidItemWithAccounts) {
+async function syncSinglePlaidItem(
+  plaidItem: PlaidItemWithAccounts,
+  activeRules: Awaited<ReturnType<typeof getActiveTransactionRules>>
+) {
   const plaidClient = getPlaidApi();
   let cursor = plaidItem.transactionsCursor ?? undefined;
   let addedCount = 0;
@@ -429,8 +467,8 @@ async function syncSinglePlaidItem(plaidItem: PlaidItemWithAccounts) {
       const response = await plaidClient.transactionsSync(request);
       const { added, modified, removed, next_cursor, has_more } = response.data;
 
-      await upsertTransactionsForItem(plaidItem, added);
-      await upsertTransactionsForItem(plaidItem, modified);
+      await upsertTransactionsForItem(plaidItem, added, activeRules);
+      await upsertTransactionsForItem(plaidItem, modified, activeRules);
       removedCount += await removeTransactions(removed);
 
       addedCount += added.length;
@@ -498,10 +536,11 @@ export async function syncTransactionsForLinkedItems() {
     };
   }
 
+  const activeRules = await getActiveTransactionRules(plaidItems[0].userId);
   const syncedItems = [];
 
   for (const plaidItem of plaidItems) {
-    syncedItems.push(await syncSinglePlaidItem(plaidItem));
+    syncedItems.push(await syncSinglePlaidItem(plaidItem, activeRules));
   }
 
   return {
@@ -510,4 +549,19 @@ export async function syncTransactionsForLinkedItems() {
     totalModified: syncedItems.reduce((sum, item) => sum + item.modifiedCount, 0),
     totalRemoved: syncedItems.reduce((sum, item) => sum + item.removedCount, 0)
   };
+}
+async function removeTransactions(removedTransactions: RemovedTransaction[]) {
+  if (removedTransactions.length === 0) {
+    return 0;
+  }
+
+  const response = await prisma.transaction.deleteMany({
+    where: {
+      plaidTransactionId: {
+        in: removedTransactions.map((transaction) => transaction.transaction_id)
+      }
+    }
+  });
+
+  return response.count;
 }

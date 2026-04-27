@@ -266,6 +266,35 @@ body {
   color: var(--ink);
 }
 
+.cellStack {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.inlineActionButton {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  padding: 0.45rem 0.75rem;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease;
+}
+
+.inlineActionButton:hover {
+  transform: translateY(-1px);
+}
+
+.inlineActionButton:disabled {
+  transform: none;
+  opacity: 0.6;
+  cursor: default;
+}
+
 .transactionsTable th {
   color: var(--muted);
   font-size: 0.9rem;

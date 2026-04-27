@@ -2,6 +2,7 @@ import {
   AccountType,
   PlaidEnvironment,
   PlaidItemStatus,
+  RuleMatchType,
   TransactionDirection,
   TransactionReviewStatus,
   PrismaClient
@@ -26,6 +27,7 @@ export {
   AccountType,
   PlaidEnvironment,
   PlaidItemStatus,
+  RuleMatchType,
   TransactionDirection,
   TransactionReviewStatus
 };
