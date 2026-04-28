@@ -2,13 +2,31 @@ import { NextResponse } from "next/server";
 import { getErrorMessage } from "@/lib/errors";
 import { createLinkToken } from "@/lib/plaid";
 
-export async function POST() {
+type CreateLinkTokenPayload = {
+  mode?: "connect" | "update";
+  plaidItemId?: string;
+};
+
+export async function POST(request: Request) {
+  let payload: CreateLinkTokenPayload = {};
+
   try {
-    const response = await createLinkToken();
+    payload = (await request.json()) as CreateLinkTokenPayload;
+  } catch {
+    payload = {};
+  }
+
+  try {
+    const response = await createLinkToken({
+      mode: payload.mode,
+      plaidItemId: payload.plaidItemId
+    });
 
     return NextResponse.json({
       linkToken: response.link_token,
-      expiration: response.expiration
+      expiration: response.expiration,
+      mode: payload.mode ?? "connect",
+      plaidItemId: payload.plaidItemId ?? null
     });
   } catch (error) {
     return NextResponse.json(

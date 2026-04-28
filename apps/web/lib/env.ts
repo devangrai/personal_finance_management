@@ -14,6 +14,7 @@ loadEnvConfig(path.resolve(process.cwd(), "../.."));
 
 type AppEnv = {
   appUrl: string;
+  plaidWebhookUrl: string;
   plaidClientId: string;
   plaidSecret: string;
   plaidEnv: PlaidEnvironmentName;
@@ -65,10 +66,13 @@ export function getAppEnv(): AppEnv {
   }
 
   const appUrl = requireEnv("NEXT_PUBLIC_APP_URL");
-  new URL(appUrl);
+  const appUrlObject = new URL(appUrl);
 
   return {
     appUrl,
+    plaidWebhookUrl:
+      optionalEnv("PLAID_WEBHOOK_URL") ??
+      new URL("/api/plaid/webhook", appUrlObject).toString(),
     plaidClientId: requireEnv("PLAID_CLIENT_ID"),
     plaidSecret: resolvePlaidSecret(plaidEnvValue as PlaidEnvironmentName),
     plaidEnv: plaidEnvValue as PlaidEnvironmentName,

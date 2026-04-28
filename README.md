@@ -17,17 +17,19 @@ The MVP is focused on a single user but the schema and packages are structured s
 
 ### Phase 1
 
-- Connect bank, credit, and investment accounts with Plaid Link
+- Connect bank and credit accounts with Plaid Link
 - Store Plaid Items and accounts server-side
 - Sync depository and credit transactions with `/transactions/sync`
-- Sync investment holdings and investment transactions with Plaid Investments
 - Review and override categories in a simple UI
 - Define user rules for recurring categorization
 
 ### Phase 2
 
 - Monthly cash flow summaries
+- Production reconnect and disconnect flows for Plaid Items
+- Production webhook ingestion for transaction and item events
 - Portfolio allocation views
+- Investment holdings and investment transaction sync with Plaid Investments
 - Recurring income and bill detection
 - Emergency fund runway
 - Retirement contribution planning inputs
@@ -63,16 +65,47 @@ workers/
 5. Start Postgres locally.
 6. Generate Prisma client with `npm run db:generate`.
 7. Run the initial migration with `npm run db:migrate`.
-8. Start the app with `npm run dev`.
+8. Start the web app with `npm run dev:web`.
+
+`npm run dev` starts the full Turborepo dev graph, including the sync worker. For day-to-day local Plaid and UI work, `npm run dev:web` is the stable path.
 
 ## Current Plaid flow
 
-The first backend slice supports:
+The current app supports:
 
 - `POST /api/plaid/link-token` to create a Plaid Link token
 - `POST /api/plaid/exchange-public-token` to exchange a public token and persist the Plaid Item plus linked accounts
+- `POST /api/transactions/sync` to pull new and changed transactions with `/transactions/sync`
+- `POST /api/plaid/items/:plaidItemId/refresh` to refresh accounts and resume sync after Plaid update mode
+- `DELETE /api/plaid/items/:plaidItemId` to remove a linked Item from Plaid and delete it locally
+- `POST /api/plaid/webhook` to receive Plaid transaction and item webhooks
+
+The frontend currently supports:
+
+- linking a new institution
+- reconnecting an Item with Plaid update mode
+- disconnecting an Item
+- reviewing and editing transaction categories
+- creating merchant-based categorization rules
+- monthly cash flow summaries
+- recurring inflow and outflow detection
 
 The current implementation assumes a single bootstrap user derived from `DEFAULT_USER_EMAIL`. That keeps Item and account persistence deterministic until application auth is added.
+
+## Production checklist
+
+Before testing a real OAuth institution like Capital One or Bank of America:
+
+1. Deploy the app to a real `https://` URL.
+2. Set `NEXT_PUBLIC_APP_URL` to that deployed origin.
+3. Set `PLAID_ENV=production`.
+4. Set `PLAID_SECRET` or `PLAID_PRODUCTION_SECRET` to your production secret.
+5. Set `PLAID_REDIRECT_URI` to `https://<your-domain>/plaid/oauth-return`.
+6. Add that redirect URI to the Plaid Dashboard allowlist.
+7. Set `PLAID_WEBHOOK_URL` if your webhook URL differs from `NEXT_PUBLIC_APP_URL + /api/plaid/webhook`.
+8. Keep `PLAID_PRODUCTS="transactions"` until you are ready to pay for `investments`.
+
+The first real-institution test should be one account only. That keeps reconnect, webhook, and disconnect behavior easy to inspect before you broaden coverage.
 
 ## GitHub setup
 

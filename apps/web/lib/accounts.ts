@@ -42,7 +42,9 @@ export async function listLinkedAccounts() {
               institutionId: true,
               institutionName: true,
               status: true,
+              errorCode: true,
               plaidEnvironment: true,
+              lastWebhookAt: true,
               lastSyncedAt: true,
               updatedAt: true
             }

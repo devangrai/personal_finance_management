@@ -7,6 +7,12 @@ import {
   type PlaidLinkOnSuccessMetadata,
   usePlaidLink
 } from "react-plaid-link";
+import {
+  clearPlaidLinkSession,
+  readPlaidLinkSession,
+  type StoredPlaidLinkSession,
+  writePlaidLinkSession
+} from "@/lib/plaid-link-session";
 
 type LinkedAccount = {
   id: string;
@@ -24,7 +30,9 @@ type LinkedAccount = {
     institutionId: string | null;
     institutionName: string | null;
     status: string;
+    errorCode: string | null;
     plaidEnvironment: string;
+    lastWebhookAt: string | null;
     lastSyncedAt: string | null;
     updatedAt: string;
   };
@@ -78,6 +86,19 @@ type TransactionCategory = {
 
 type CategoriesResponse = {
   categories: TransactionCategory[];
+};
+
+type PlaidItemSummary = {
+  id: string;
+  institutionId: string | null;
+  institutionName: string | null;
+  status: string;
+  errorCode: string | null;
+  plaidEnvironment: string;
+  lastWebhookAt: string | null;
+  lastSyncedAt: string | null;
+  updatedAt: string;
+  accountCount: number;
 };
 
 type CashflowSummaryMonth = {
@@ -135,7 +156,7 @@ type RecurringSummaryResponse = {
 const plaidSetupSteps = [
   "Create a free Plaid developer account and open the Dashboard.",
   "Copy your Sandbox client_id and secret into the app .env file.",
-  "Add your local redirect URI to Plaid's allowed redirect URIs list if you plan to test OAuth institutions.",
+  "Use a real HTTPS redirect URI that points to /plaid/oauth-return when you move to OAuth institutions in production.",
   "Apply the Prisma migration to your local Postgres database before testing account linking."
 ];
 
@@ -204,6 +225,19 @@ function formatShortDate(value: string | null) {
   }).format(new Date(`${value}T00:00:00.000Z`));
 }
 
+function formatPlaidItemStatus(status: string) {
+  switch (status) {
+    case "needs_reauth":
+      return "Needs re-auth";
+    case "disconnected":
+      return "Disconnected";
+    case "error":
+      return "Error";
+    default:
+      return "Healthy";
+  }
+}
+
 export function PlaidConnectionPanel() {
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
@@ -220,12 +254,16 @@ export function PlaidConnectionPanel() {
   const [recurringError, setRecurringError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [linkSession, setLinkSession] = useState<StoredPlaidLinkSession | null>(null);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [isLoadingCashflow, setIsLoadingCashflow] = useState(true);
   const [isLoadingRecurring, setIsLoadingRecurring] = useState(true);
   const [isCreatingLinkToken, setIsCreatingLinkToken] = useState(false);
   const [isSyncingTransactions, setIsSyncingTransactions] = useState(false);
+  const [disconnectingPlaidItemId, setDisconnectingPlaidItemId] = useState<
+    string | null
+  >(null);
   const [savingTransactionId, setSavingTransactionId] = useState<string | null>(null);
   const [creatingRuleTransactionId, setCreatingRuleTransactionId] = useState<
     string | null
@@ -368,6 +406,82 @@ export function PlaidConnectionPanel() {
     void refreshRecurringSummary();
   }, []);
 
+  const linkedItems = useMemo(() => {
+    const items = new Map<string, PlaidItemSummary>();
+
+    for (const account of accounts) {
+      const current = items.get(account.plaidItem.id);
+
+      if (current) {
+        current.accountCount += 1;
+        continue;
+      }
+
+      items.set(account.plaidItem.id, {
+        ...account.plaidItem,
+        accountCount: 1
+      });
+    }
+
+    return Array.from(items.values());
+  }, [accounts]);
+
+  function clearLinkState() {
+    setLinkToken(null);
+    setLinkSession(null);
+    setPendingOpen(false);
+    clearPlaidLinkSession();
+  }
+
+  async function completeLinkSession(
+    publicToken: string,
+    metadata: PlaidLinkOnSuccessMetadata,
+    sessionOverride?: StoredPlaidLinkSession | null
+  ) {
+    const activeSession = sessionOverride ?? linkSession ?? readPlaidLinkSession();
+    if (!activeSession) {
+      throw new Error("Plaid Link session details were not found.");
+    }
+
+    if (activeSession.mode === "update" && activeSession.plaidItemId) {
+      const response = await fetch(
+        `/api/plaid/items/${activeSession.plaidItemId}/refresh`,
+        {
+          method: "POST"
+        }
+      );
+      const payload = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? "Unable to refresh the linked institution after re-auth."
+        );
+      }
+    } else {
+      const response = await fetch("/api/plaid/exchange-public-token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          publicToken,
+          institution: metadata.institution
+        })
+      });
+      const payload = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to exchange public token.");
+      }
+    }
+
+    await refreshAccounts();
+    await refreshTransactions();
+    await refreshCashflowSummary();
+    await refreshRecurringSummary();
+    clearLinkState();
+  }
+
   const plaidConfig = useMemo(
     () => ({
       token: linkToken,
@@ -375,31 +489,20 @@ export function PlaidConnectionPanel() {
         publicToken: string,
         metadata: PlaidLinkOnSuccessMetadata
       ) => {
-        setStatusMessage("Exchanging public token and saving linked accounts...");
+        const activeSession = linkSession ?? readPlaidLinkSession();
+        setStatusMessage(
+          activeSession?.mode === "update"
+            ? "Refreshing the linked institution after re-authentication..."
+            : "Exchanging public token and saving linked accounts..."
+        );
 
         try {
-          const response = await fetch("/api/plaid/exchange-public-token", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              publicToken,
-              institution: metadata.institution
-            })
-          });
-
-          const payload = (await response.json()) as { error?: string };
-          if (!response.ok) {
-            throw new Error(payload.error ?? "Unable to exchange public token.");
-          }
-
-          await refreshAccounts();
-          await refreshTransactions();
-          await refreshCashflowSummary();
-          await refreshRecurringSummary();
-          setStatusMessage("Linked account saved successfully.");
-          setLinkToken(null);
+          await completeLinkSession(publicToken, metadata, activeSession);
+          setStatusMessage(
+            activeSession?.mode === "update"
+              ? "Institution re-authenticated successfully."
+              : "Linked account saved successfully."
+          );
         } catch (error) {
           setStatusMessage(
             error instanceof Error
@@ -415,10 +518,10 @@ export function PlaidConnectionPanel() {
           setStatusMessage("Plaid Link closed before account connection completed.");
         }
 
-        setPendingOpen(false);
+        clearLinkState();
       }
     }),
-    [linkToken]
+    [linkSession, linkToken]
   );
 
   const { open, ready } = usePlaidLink(plaidConfig);
@@ -430,13 +533,27 @@ export function PlaidConnectionPanel() {
     }
   }, [open, pendingOpen, ready]);
 
-  async function handleConnectClick() {
+  async function handleStartLink(
+    mode: StoredPlaidLinkSession["mode"],
+    plaidItemId?: string
+  ) {
     setIsCreatingLinkToken(true);
-    setStatusMessage("Creating a Plaid Link token...");
+    setStatusMessage(
+      mode === "update"
+        ? "Preparing Plaid Link for re-authentication..."
+        : "Creating a Plaid Link token..."
+    );
 
     try {
       const response = await fetch("/api/plaid/link-token", {
-        method: "POST"
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          mode,
+          plaidItemId
+        })
       });
       const payload = (await response.json()) as {
         linkToken?: string;
@@ -447,6 +564,14 @@ export function PlaidConnectionPanel() {
         throw new Error(payload.error ?? "Unable to create a Plaid Link token.");
       }
 
+      const session = {
+        linkToken: payload.linkToken,
+        mode,
+        plaidItemId: plaidItemId ?? null
+      } satisfies StoredPlaidLinkSession;
+
+      setLinkSession(session);
+      writePlaidLinkSession(session);
       setLinkToken(payload.linkToken);
       setPendingOpen(true);
       setStatusMessage("Plaid Link is ready.");
@@ -461,6 +586,14 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  async function handleConnectClick() {
+    await handleStartLink("connect");
+  }
+
+  async function handleReconnectClick(plaidItemId: string) {
+    await handleStartLink("update", plaidItemId);
+  }
+
   async function handleSyncTransactions() {
     setIsSyncingTransactions(true);
     setStatusMessage("Syncing transactions from Plaid...");
@@ -473,6 +606,10 @@ export function PlaidConnectionPanel() {
         totalAdded?: number;
         totalModified?: number;
         totalRemoved?: number;
+        failedItems?: Array<{
+          institutionName: string | null;
+          error: string;
+        }>;
         error?: string;
       };
 
@@ -483,8 +620,12 @@ export function PlaidConnectionPanel() {
       await Promise.all([refreshAccounts(), refreshTransactions()]);
       await refreshCashflowSummary();
       await refreshRecurringSummary();
+      const failureSuffix =
+        payload.failedItems && payload.failedItems.length > 0
+          ? ` ${payload.failedItems.length} institution(s) still need attention.`
+          : "";
       setStatusMessage(
-        `Transactions synced. Added ${payload.totalAdded ?? 0}, modified ${payload.totalModified ?? 0}, removed ${payload.totalRemoved ?? 0}.`
+        `Transactions synced. Added ${payload.totalAdded ?? 0}, modified ${payload.totalModified ?? 0}, removed ${payload.totalRemoved ?? 0}.${failureSuffix}`
       );
     } catch (error) {
       setStatusMessage(
@@ -492,6 +633,43 @@ export function PlaidConnectionPanel() {
       );
     } finally {
       setIsSyncingTransactions(false);
+    }
+  }
+
+  async function handleDisconnectItem(plaidItemId: string, institutionName: string) {
+    const confirmed = window.confirm(
+      `Disconnect ${institutionName} and delete its linked accounts and transactions from this app?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDisconnectingPlaidItemId(plaidItemId);
+
+    try {
+      const response = await fetch(`/api/plaid/items/${plaidItemId}`, {
+        method: "DELETE"
+      });
+      const payload = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to disconnect the institution.");
+      }
+
+      await refreshAccounts();
+      await refreshTransactions();
+      await refreshCashflowSummary();
+      await refreshRecurringSummary();
+      setStatusMessage(`${institutionName} was disconnected and removed.`);
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to disconnect the institution."
+      );
+    } finally {
+      setDisconnectingPlaidItemId(null);
     }
   }
 
@@ -804,7 +982,13 @@ export function PlaidConnectionPanel() {
 
       <div className="accountsBlock">
         <div className="accountsHeader">
-          <h3>Linked accounts</h3>
+          <div>
+            <h3>Linked institutions</h3>
+            <p className="panelCopy">
+              Production-ready flows need item health, reconnect, and disconnect
+              controls in addition to the raw account list.
+            </p>
+          </div>
           <div className="buttonRow">
             <button
               className="secondaryButton"
@@ -828,31 +1012,81 @@ export function PlaidConnectionPanel() {
           <p className="panelCopy">Loading linked accounts...</p>
         ) : accountsError ? (
           <p className="errorLine">{accountsError}</p>
-        ) : accounts.length === 0 ? (
+        ) : linkedItems.length === 0 ? (
           <p className="panelCopy">
             No linked accounts yet. Once your Plaid sandbox credentials are in
             place, use the connect button to create the first Item.
           </p>
         ) : (
-          <div className="accountsGrid">
-            {accounts.map((account) => (
-              <article key={account.id} className="accountCard">
-                <p className="eyebrow">
-                  {account.plaidItem.institutionName ?? "Linked institution"}
-                </p>
-                <h4>{account.name}</h4>
-                <p className="panelCopy">
-                  {account.officialName ?? `${account.type} / ${account.subtype ?? "other"}`}
-                </p>
-                <p className="balanceLine">{formatBalance(account)}</p>
-                <p className="metaLine">
-                  {account.type}
-                  {account.subtype ? ` · ${account.subtype}` : ""}
-                  {account.mask ? ` · ••${account.mask}` : ""}
-                </p>
-              </article>
-            ))}
-          </div>
+          <>
+            <div className="accountsGrid">
+              {linkedItems.map((item) => (
+                <article key={item.id} className="accountCard">
+                  <p className="eyebrow">{item.institutionName ?? "Linked institution"}</p>
+                  <h4>{formatPlaidItemStatus(item.status)}</h4>
+                  <p className="panelCopy">
+                    {item.accountCount} account{item.accountCount === 1 ? "" : "s"} ·{" "}
+                    {item.plaidEnvironment}
+                  </p>
+                  <p className="metaLine">
+                    Last sync: {item.lastSyncedAt ? formatTransactionDate(item.lastSyncedAt) : "Never"}
+                  </p>
+                  <p className="metaLine">
+                    Last webhook:{" "}
+                    {item.lastWebhookAt ? formatTransactionDate(item.lastWebhookAt) : "Not received yet"}
+                  </p>
+                  {item.errorCode ? (
+                    <p className="metaLine">Plaid signal: {item.errorCode}</p>
+                  ) : null}
+                  <div className="buttonRow">
+                    <button
+                      className="secondaryButton"
+                      disabled={isCreatingLinkToken}
+                      onClick={() => void handleReconnectClick(item.id)}
+                      type="button"
+                    >
+                      {item.status === "needs_reauth" ? "Reconnect" : "Update access"}
+                    </button>
+                    <button
+                      className="secondaryButton"
+                      disabled={disconnectingPlaidItemId === item.id}
+                      onClick={() =>
+                        void handleDisconnectItem(
+                          item.id,
+                          item.institutionName ?? "this institution"
+                        )
+                      }
+                      type="button"
+                    >
+                      {disconnectingPlaidItemId === item.id
+                        ? "Disconnecting..."
+                        : "Disconnect"}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="accountsGrid">
+              {accounts.map((account) => (
+                <article key={account.id} className="accountCard">
+                  <p className="eyebrow">
+                    {account.plaidItem.institutionName ?? "Linked institution"}
+                  </p>
+                  <h4>{account.name}</h4>
+                  <p className="panelCopy">
+                    {account.officialName ?? `${account.type} / ${account.subtype ?? "other"}`}
+                  </p>
+                  <p className="balanceLine">{formatBalance(account)}</p>
+                  <p className="metaLine">
+                    {account.type}
+                    {account.subtype ? ` · ${account.subtype}` : ""}
+                    {account.mask ? ` · ••${account.mask}` : ""}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
