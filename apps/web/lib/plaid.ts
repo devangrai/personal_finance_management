@@ -48,6 +48,7 @@ type PersistPlaidItemInput = {
 type PlaidItemWithAccounts = Awaited<
   ReturnType<typeof listPersistedPlaidItems>
 >[number];
+type PersistedPlaidAccount = PlaidItemWithAccounts["accounts"][number];
 
 function resolvePlaidItemEnvironment(value: string) {
   switch (value) {
@@ -525,11 +526,17 @@ async function upsertTransactionsForItem(
     return;
   }
 
-  const accountIdByPlaidAccountId = new Map(
-    plaidItem.accounts.map((account) => [account.plaidAccountId, account.id])
+  const accountIdByPlaidAccountId = new Map<string, string>(
+    plaidItem.accounts.map((account: PersistedPlaidAccount) => [
+      account.plaidAccountId,
+      account.id
+    ])
   );
-  const accountNameByPlaidAccountId = new Map(
-    plaidItem.accounts.map((account) => [account.plaidAccountId, account.name])
+  const accountNameByPlaidAccountId = new Map<string, string>(
+    plaidItem.accounts.map((account: PersistedPlaidAccount) => [
+      account.plaidAccountId,
+      account.name
+    ])
   );
   const existingTransactions = await prisma.transaction.findMany({
     where: {
