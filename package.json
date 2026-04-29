@@ -11,12 +11,12 @@
     "workers/*"
   ],
   "scripts": {
-    "build": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && turbo run build'",
-    "dev": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && turbo run dev --parallel'",
-    "dev:web": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && export PORT=${PORT:-3001} && set -a && [ -f .env ] && source .env && set +a && npm run dev --workspace @portfolio/web'",
-    "typecheck": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && turbo run typecheck'",
-    "db:generate": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && npm run db:generate --workspace @portfolio/db'",
-    "db:migrate": "/bin/zsh -lc 'export PATH=/opt/homebrew/bin:$PATH && set -a && [ -f .env ] && source .env && set +a && npm run db:migrate --workspace @portfolio/db'"
+    "build": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; turbo run build'",
+    "dev": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; turbo run dev --parallel'",
+    "dev:web": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; export PORT=${PORT:-3001}; set -a; [ -f .env ] && . ./.env; set +a; npm run dev --workspace @portfolio/web'",
+    "typecheck": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; turbo run typecheck'",
+    "db:generate": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; npm run db:generate --workspace @portfolio/db'",
+    "db:migrate": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; npm run db:migrate --workspace @portfolio/db'"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
