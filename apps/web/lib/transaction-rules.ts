@@ -13,6 +13,17 @@ type MatchingCandidate = {
   transactionName: string;
 };
 
+type RuleBackfillTransaction = {
+  id: string;
+  accountId: string;
+  name: string;
+  merchantName: string | null;
+  personalFinanceCategory: string | null;
+  account: {
+    name: string;
+  };
+};
+
 type ActiveRule = Awaited<ReturnType<typeof getActiveTransactionRules>>[number];
 
 function normalizeValue(value: string) {
@@ -160,7 +171,7 @@ async function applyRuleToMatchingTransactions(rule: ActiveRule & { userId?: str
   });
 
   const matchingTransactionIds = transactions
-    .filter((transaction) =>
+    .filter((transaction: RuleBackfillTransaction) =>
       matchesRule(rule, {
         accountId: transaction.accountId,
         accountName: transaction.account.name,
@@ -169,7 +180,7 @@ async function applyRuleToMatchingTransactions(rule: ActiveRule & { userId?: str
         transactionName: transaction.name
       })
     )
-    .map((transaction) => transaction.id);
+    .map((transaction: RuleBackfillTransaction) => transaction.id);
 
   if (matchingTransactionIds.length === 0) {
     return 0;
