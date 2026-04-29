@@ -1,12 +1,64 @@
-import {
-  AccountType,
-  PlaidEnvironment,
-  PlaidItemStatus,
-  RuleMatchType,
-  TransactionDirection,
-  TransactionReviewStatus,
-  PrismaClient
-} from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
+
+export const PlaidEnvironment = {
+  sandbox: "sandbox",
+  development: "development",
+  production: "production"
+} as const;
+
+export type PlaidEnvironment =
+  (typeof PlaidEnvironment)[keyof typeof PlaidEnvironment];
+
+export const PlaidItemStatus = {
+  active: "active",
+  error: "error",
+  needs_reauth: "needs_reauth",
+  disconnected: "disconnected"
+} as const;
+
+export type PlaidItemStatus =
+  (typeof PlaidItemStatus)[keyof typeof PlaidItemStatus];
+
+export const AccountType = {
+  depository: "depository",
+  credit: "credit",
+  investment: "investment",
+  loan: "loan",
+  other: "other"
+} as const;
+
+export type AccountType = (typeof AccountType)[keyof typeof AccountType];
+
+export const TransactionDirection = {
+  debit: "debit",
+  credit: "credit"
+} as const;
+
+export type TransactionDirection =
+  (typeof TransactionDirection)[keyof typeof TransactionDirection];
+
+export const TransactionReviewStatus = {
+  uncategorized: "uncategorized",
+  auto_categorized: "auto_categorized",
+  user_categorized: "user_categorized",
+  ignored: "ignored"
+} as const;
+
+export type TransactionReviewStatus =
+  (typeof TransactionReviewStatus)[keyof typeof TransactionReviewStatus];
+
+export const RuleMatchType = {
+  merchant_name: "merchant_name",
+  transaction_name: "transaction_name",
+  plaid_category: "plaid_category",
+  account_name: "account_name",
+  exact: "exact",
+  contains: "contains",
+  regex: "regex"
+} as const;
+
+export type RuleMatchType =
+  (typeof RuleMatchType)[keyof typeof RuleMatchType];
 
 declare global {
   // eslint-disable-next-line no-var
@@ -22,12 +74,3 @@ export const prisma =
 if (process.env.NODE_ENV !== "production") {
   globalThis.__portfolioPrisma__ = prisma;
 }
-
-export {
-  AccountType,
-  PlaidEnvironment,
-  PlaidItemStatus,
-  RuleMatchType,
-  TransactionDirection,
-  TransactionReviewStatus
-};
