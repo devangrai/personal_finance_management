@@ -49,6 +49,12 @@ type PlaidItemWithAccounts = Awaited<
   ReturnType<typeof listPersistedPlaidItems>
 >[number];
 type PersistedPlaidAccount = PlaidItemWithAccounts["accounts"][number];
+type ExistingPersistedTransaction = {
+  id: string;
+  plaidTransactionId: string;
+  categoryId: string | null;
+  reviewStatus: TransactionReviewStatus;
+};
 
 function resolvePlaidItemEnvironment(value: string) {
   switch (value) {
@@ -551,8 +557,8 @@ async function upsertTransactionsForItem(
       reviewStatus: true
     }
   });
-  const existingTransactionByPlaidId = new Map(
-    existingTransactions.map((transaction) => [
+  const existingTransactionByPlaidId = new Map<string, ExistingPersistedTransaction>(
+    existingTransactions.map((transaction: ExistingPersistedTransaction) => [
       transaction.plaidTransactionId,
       transaction
     ])
