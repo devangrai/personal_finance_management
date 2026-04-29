@@ -123,8 +123,11 @@ export async function getCashflowSummary(months = 6) {
       label: true
     }
   });
-  const categoryLabelByKey = new Map(
-    categoryLabels.map((category) => [category.key, category.label])
+  const categoryLabelByKey = new Map<string, string>(
+    categoryLabels.map((category: { key: string; label: string }) => [
+      category.key,
+      category.label
+    ])
   );
 
   const summaryByMonth = new Map<string, MonthlyAccumulator>();

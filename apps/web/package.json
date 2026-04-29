@@ -5,7 +5,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-    "typecheck": "tsc --project tsconfig.json --noEmit"
+    "typecheck": "next typegen && tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
     "@portfolio/ai": "0.1.0",
