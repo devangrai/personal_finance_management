@@ -592,22 +592,32 @@ async function upsertTransactionsForItem(
           transaction.personal_finance_category?.detailed ?? null,
         transactionName: transaction.name
       });
-      const categorization =
-        existingTransaction?.reviewStatus === TransactionReviewStatus.user_categorized ||
-        existingTransaction?.reviewStatus === TransactionReviewStatus.ignored
-          ? {
-              categoryId: existingTransaction.categoryId,
-              reviewStatus: existingTransaction.reviewStatus
-            }
-          : matchedRule
-            ? {
-                categoryId: matchedRule.categoryId,
-                reviewStatus: TransactionReviewStatus.auto_categorized
-              }
-            : {
-                categoryId: null,
-                reviewStatus: TransactionReviewStatus.uncategorized
-              };
+      let categorization: {
+        categoryId: string | null;
+        reviewStatus: TransactionReviewStatus;
+      };
+
+      if (
+        existingTransaction &&
+        (existingTransaction.reviewStatus ===
+          TransactionReviewStatus.user_categorized ||
+          existingTransaction.reviewStatus === TransactionReviewStatus.ignored)
+      ) {
+        categorization = {
+          categoryId: existingTransaction.categoryId,
+          reviewStatus: existingTransaction.reviewStatus
+        };
+      } else if (matchedRule) {
+        categorization = {
+          categoryId: matchedRule.categoryId,
+          reviewStatus: TransactionReviewStatus.auto_categorized
+        };
+      } else {
+        categorization = {
+          categoryId: null,
+          reviewStatus: TransactionReviewStatus.uncategorized
+        };
+      }
       const transactionData = {
         userId: plaidItem.userId,
         accountId,
