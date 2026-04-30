@@ -14,6 +14,23 @@ import {
   writePlaidLinkSession
 } from "@/lib/plaid-link-session";
 
+type PlaidLinkLauncherProps = {
+  linkToken: string | null;
+  linkSession: StoredPlaidLinkSession | null;
+  pendingOpen: boolean;
+  onOpened: () => void;
+  onSuccess: (
+    publicToken: string,
+    metadata: PlaidLinkOnSuccessMetadata,
+    session: StoredPlaidLinkSession | null
+  ) => Promise<void>;
+  onExit: (
+    error: PlaidLinkError | null,
+    metadata: PlaidLinkOnExitMetadata
+  ) => void;
+  onReadyChange: (ready: boolean) => void;
+};
+
 type LinkedAccount = {
   id: string;
   plaidAccountId: string;
@@ -238,6 +255,40 @@ function formatPlaidItemStatus(status: string) {
   }
 }
 
+function PlaidLinkLauncher({
+  linkToken,
+  linkSession,
+  pendingOpen,
+  onOpened,
+  onSuccess,
+  onExit,
+  onReadyChange
+}: PlaidLinkLauncherProps) {
+  const { open, ready } = usePlaidLink({
+    token: linkToken,
+    onSuccess: async (
+      publicToken: string,
+      metadata: PlaidLinkOnSuccessMetadata
+    ) => {
+      await onSuccess(publicToken, metadata, linkSession);
+    },
+    onExit
+  });
+
+  useEffect(() => {
+    onReadyChange(ready);
+  }, [onReadyChange, ready]);
+
+  useEffect(() => {
+    if (ready && pendingOpen) {
+      open();
+      onOpened();
+    }
+  }, [onOpened, open, pendingOpen, ready]);
+
+  return null;
+}
+
 export function PlaidConnectionPanel() {
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
@@ -269,6 +320,8 @@ export function PlaidConnectionPanel() {
     string | null
   >(null);
   const [pendingOpen, setPendingOpen] = useState(false);
+  const [isLinkReady, setIsLinkReady] = useState(false);
+  const [linkLauncherKey, setLinkLauncherKey] = useState(0);
 
   async function refreshAccounts() {
     setIsLoadingAccounts(true);
@@ -430,6 +483,7 @@ export function PlaidConnectionPanel() {
     setLinkToken(null);
     setLinkSession(null);
     setPendingOpen(false);
+    setIsLinkReady(false);
     clearPlaidLinkSession();
   }
 
@@ -482,57 +536,6 @@ export function PlaidConnectionPanel() {
     clearLinkState();
   }
 
-  const plaidConfig = useMemo(
-    () => ({
-      token: linkToken,
-      onSuccess: async (
-        publicToken: string,
-        metadata: PlaidLinkOnSuccessMetadata
-      ) => {
-        const activeSession = linkSession ?? readPlaidLinkSession();
-        setStatusMessage(
-          activeSession?.mode === "update"
-            ? "Refreshing the linked institution after re-authentication..."
-            : "Exchanging public token and saving linked accounts..."
-        );
-
-        try {
-          await completeLinkSession(publicToken, metadata, activeSession);
-          setStatusMessage(
-            activeSession?.mode === "update"
-              ? "Institution re-authenticated successfully."
-              : "Linked account saved successfully."
-          );
-        } catch (error) {
-          setStatusMessage(
-            error instanceof Error
-              ? error.message
-              : "Unable to exchange public token."
-          );
-        }
-      },
-      onExit: (error: PlaidLinkError | null, metadata: PlaidLinkOnExitMetadata) => {
-        if (error) {
-          setStatusMessage(error.error_message ?? "Plaid Link exited with an error.");
-        } else {
-          setStatusMessage("Plaid Link closed before account connection completed.");
-        }
-
-        clearLinkState();
-      }
-    }),
-    [linkSession, linkToken]
-  );
-
-  const { open, ready } = usePlaidLink(plaidConfig);
-
-  useEffect(() => {
-    if (ready && pendingOpen) {
-      open();
-      setPendingOpen(false);
-    }
-  }, [open, pendingOpen, ready]);
-
   async function handleStartLink(
     mode: StoredPlaidLinkSession["mode"],
     plaidItemId?: string
@@ -574,6 +577,8 @@ export function PlaidConnectionPanel() {
       writePlaidLinkSession(session);
       setLinkToken(payload.linkToken);
       setPendingOpen(true);
+      setIsLinkReady(false);
+      setLinkLauncherKey((currentKey) => currentKey + 1);
       setStatusMessage("Plaid Link is ready.");
     } catch (error) {
       setStatusMessage(
@@ -773,6 +778,56 @@ export function PlaidConnectionPanel() {
       </div>
 
       <div className="grid gridWide">
+        <PlaidLinkLauncher
+          key={linkLauncherKey}
+          linkToken={linkToken}
+          linkSession={linkSession}
+          onExit={(error: PlaidLinkError | null) => {
+            if (error) {
+              setStatusMessage(
+                error.error_message ?? "Plaid Link exited with an error."
+              );
+            } else {
+              setStatusMessage(
+                "Plaid Link closed before account connection completed."
+              );
+            }
+
+            clearLinkState();
+          }}
+          onOpened={() => {
+            setPendingOpen(false);
+          }}
+          onReadyChange={setIsLinkReady}
+          onSuccess={async (
+            publicToken: string,
+            metadata: PlaidLinkOnSuccessMetadata,
+            session: StoredPlaidLinkSession | null
+          ) => {
+            const activeSession = session ?? readPlaidLinkSession();
+            setStatusMessage(
+              activeSession?.mode === "update"
+                ? "Refreshing the linked institution after re-authentication..."
+                : "Exchanging public token and saving linked accounts..."
+            );
+
+            try {
+              await completeLinkSession(publicToken, metadata, activeSession);
+              setStatusMessage(
+                activeSession?.mode === "update"
+                  ? "Institution re-authenticated successfully."
+                  : "Linked account saved successfully."
+              );
+            } catch (error) {
+              setStatusMessage(
+                error instanceof Error
+                  ? error.message
+                  : "Unable to exchange public token."
+              );
+            }
+          }}
+          pendingOpen={pendingOpen}
+        />
         <article className="card">
           <h3>Before you test</h3>
           <ol className="orderedList">
@@ -789,7 +844,7 @@ export function PlaidConnectionPanel() {
             {statusMessage ?? "No Plaid Link session has been started yet."}
           </p>
           <p className="metaLine">
-            Link ready: {ready ? "yes" : linkToken ? "loading" : "not started"}
+            Link ready: {isLinkReady ? "yes" : linkToken ? "loading" : "not started"}
           </p>
         </article>
       </div>
