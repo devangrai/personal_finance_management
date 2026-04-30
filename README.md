@@ -90,7 +90,7 @@ The frontend currently supports:
 - AI-assisted transaction categorization for the next 50-100 uncategorized rows
 - monthly cash flow summaries
 - recurring inflow and outflow detection
-- a nightly daily-review digest that can ping a webhook at a scheduled local hour
+- a nightly daily-review digest that can email you a review link or ping a webhook at a scheduled local hour
 
 The current implementation assumes a single bootstrap user derived from `DEFAULT_USER_EMAIL`. That keeps Item and account persistence deterministic until application auth is added.
 
@@ -112,6 +112,7 @@ For the daily review loop:
 - the app checks `DAILY_REVIEW_TIMEZONE` and `DAILY_REVIEW_HOUR_LOCAL` internally
 - at the scheduled local hour, the app auto-categorizes that day’s uncategorized transactions
 - it persists a `DailyReviewDigest`
+- it can optionally send an email with a review link using Resend
 - it can optionally send a webhook ping using `DAILY_REVIEW_WEBHOOK_URL`
 
 Recommended env settings for this feature:
@@ -122,6 +123,10 @@ Recommended env settings for this feature:
 - `GEMINI_MODEL` default `gemini-2.5-flash`
 - `DAILY_REVIEW_TIMEZONE` default `America/Los_Angeles`
 - `DAILY_REVIEW_HOUR_LOCAL` default `20`
+- `RESEND_API_KEY` optional email delivery key
+- `DAILY_REVIEW_EMAIL_TO` optional destination email
+- `DAILY_REVIEW_EMAIL_FROM` optional verified sender
+- `DAILY_REVIEW_EMAIL_REPLY_TO` optional reply-to address
 - `DAILY_REVIEW_WEBHOOK_URL` optional
 - `DAILY_REVIEW_WEBHOOK_BEARER_TOKEN` optional
 - `CRON_SECRET` for the Vercel cron endpoint

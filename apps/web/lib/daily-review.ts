@@ -25,6 +25,7 @@ type RunDailyReviewCycleResult = {
     transactionCount: number;
     autoCategorizedCount: number;
     uncategorizedCount: number;
+    needsReviewCount: number;
     reviewUrl: string | null;
     status: string;
     sentAt: string | null;
@@ -94,55 +95,130 @@ async function sendDailyReviewPing(input: {
   transactionCount: number;
   autoCategorizedCount: number;
   uncategorizedCount: number;
+  needsReviewCount: number;
 }) {
   const env = getAppEnv();
-  if (!env.dailyReviewWebhookUrl) {
-    return {
-      delivered: false,
-      error: null as string | null
-    };
+  const deliveryErrors: string[] = [];
+  let delivered = false;
+  const hasEmailConfig =
+    Boolean(env.resendApiKey) &&
+    Boolean(env.dailyReviewEmailTo) &&
+    Boolean(env.dailyReviewEmailFrom);
+  const hasPartialEmailConfig =
+    Boolean(env.resendApiKey) ||
+    Boolean(env.dailyReviewEmailTo) ||
+    Boolean(env.dailyReviewEmailFrom);
+
+  if (!hasEmailConfig && hasPartialEmailConfig) {
+    deliveryErrors.push(
+      "Email delivery is partially configured. Set RESEND_API_KEY, DAILY_REVIEW_EMAIL_TO, and DAILY_REVIEW_EMAIL_FROM together."
+    );
   }
 
-  try {
-    const response = await fetch(env.dailyReviewWebhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(env.dailyReviewWebhookBearerToken
-          ? {
-              Authorization: `Bearer ${env.dailyReviewWebhookBearerToken}`
-            }
-          : {})
-      },
-      body: JSON.stringify({
-        title: `Daily transaction review for ${input.localDateKey}`,
-        message:
-          `${input.transactionCount} transaction(s) need a look. ` +
-          `${input.autoCategorizedCount} were AI-categorized and ` +
-          `${input.uncategorizedCount} still need a manual category.`,
-        reviewUrl: input.reviewUrl,
-        date: input.localDateKey
-      })
-    });
+  if (hasEmailConfig) {
+    try {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.resendApiKey}`
+        },
+        body: JSON.stringify({
+          from: env.dailyReviewEmailFrom,
+          to: [env.dailyReviewEmailTo],
+          ...(env.dailyReviewEmailReplyTo
+            ? {
+                reply_to: env.dailyReviewEmailReplyTo
+              }
+            : {}),
+          subject: `Daily transaction review for ${input.localDateKey}`,
+          text:
+            `Your daily transaction review for ${input.localDateKey} is ready.\n\n` +
+            `${input.transactionCount} transaction(s) posted today.\n` +
+            `${input.autoCategorizedCount} were AI-categorized and should be checked.\n` +
+            `${input.uncategorizedCount} still need a manual category.\n` +
+            `${input.needsReviewCount} total transaction(s) need your review.\n\n` +
+            `Open the review queue: ${input.reviewUrl}`,
+          html:
+            `<div style="font-family: Georgia, serif; line-height: 1.6; color: #1a1712;">` +
+            `<h2 style="margin-bottom: 8px;">Daily transaction review</h2>` +
+            `<p style="margin-top: 0;">${input.localDateKey}</p>` +
+            `<p><strong>${input.transactionCount}</strong> transaction(s) posted today.</p>` +
+            `<ul>` +
+            `<li><strong>${input.autoCategorizedCount}</strong> were AI-categorized and should be checked.</li>` +
+            `<li><strong>${input.uncategorizedCount}</strong> still need a manual category.</li>` +
+            `<li><strong>${input.needsReviewCount}</strong> total transaction(s) need your review.</li>` +
+            `</ul>` +
+            `<p><a href="${input.reviewUrl}">Open today's review queue</a></p>` +
+            `</div>`
+        })
+      });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || "Webhook returned a non-200 response.");
-    }
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Email provider returned a non-200 response.");
+      }
 
-    return {
-      delivered: true,
-      error: null as string | null
-    };
-  } catch (error) {
-    return {
-      delivered: false,
-      error:
+      delivered = true;
+    } catch (error) {
+      deliveryErrors.push(
         error instanceof Error
-          ? error.message
-          : "Unable to deliver the daily review ping."
+          ? `Email delivery failed: ${error.message}`
+          : "Email delivery failed."
+      );
+    }
+  }
+
+  if (env.dailyReviewWebhookUrl) {
+    try {
+      const response = await fetch(env.dailyReviewWebhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(env.dailyReviewWebhookBearerToken
+            ? {
+                Authorization: `Bearer ${env.dailyReviewWebhookBearerToken}`
+              }
+            : {})
+        },
+        body: JSON.stringify({
+          title: `Daily transaction review for ${input.localDateKey}`,
+          message:
+            `${input.transactionCount} transaction(s) posted today. ` +
+            `${input.autoCategorizedCount} were AI-categorized, ` +
+            `${input.uncategorizedCount} still need a manual category, ` +
+            `and ${input.needsReviewCount} total need your review.`,
+          reviewUrl: input.reviewUrl,
+          date: input.localDateKey
+        })
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Webhook returned a non-200 response.");
+      }
+
+      delivered = true;
+    } catch (error) {
+      deliveryErrors.push(
+        error instanceof Error
+          ? `Webhook delivery failed: ${error.message}`
+          : "Webhook delivery failed."
+      );
+    }
+  }
+
+  if (!env.dailyReviewWebhookUrl && !hasEmailConfig && !hasPartialEmailConfig) {
+    return {
+      delivered: false,
+      error: null as string | null
     };
   }
+
+  return {
+    delivered,
+    error: delivered ? null : deliveryErrors.join(" ")
+  };
 }
 
 function serializeDigest(
@@ -167,6 +243,7 @@ function serializeDigest(
 
   return {
     ...digest,
+    needsReviewCount: digest.autoCategorizedCount + digest.uncategorizedCount,
     sentAt: digest.sentAt?.toISOString() ?? null,
     acknowledgedAt: digest.acknowledgedAt?.toISOString() ?? null
   };
@@ -251,10 +328,12 @@ export async function runDailyReviewCycle(
   const uncategorizedCount = todaysTransactionsAfter.filter(
     (transaction) => transaction.reviewStatus === TransactionReviewStatus.uncategorized
   ).length;
+  const needsReviewCount = autoCategorizedCount + uncategorizedCount;
   const reviewUrl = `${env.appUrl}/?reviewDate=${localDateKey}`;
   const pingSummary =
     `${todaysTransactionsAfter.length} transaction(s) for ${localDateKey}. ` +
-    `${autoCategorizedCount} AI-categorized, ${uncategorizedCount} still uncategorized.`;
+    `${autoCategorizedCount} AI-categorized, ${uncategorizedCount} still uncategorized, ` +
+    `${needsReviewCount} total need review.`;
 
   const existingDigest = await prisma.dailyReviewDigest.findUnique({
     where: {
@@ -281,7 +360,8 @@ export async function runDailyReviewCycle(
         reviewUrl,
         transactionCount: todaysTransactionsAfter.length,
         autoCategorizedCount,
-        uncategorizedCount
+        uncategorizedCount,
+        needsReviewCount
       });
 
       if (pingResult.delivered) {

@@ -189,6 +189,7 @@ type DailyReviewDigest = {
   transactionCount: number;
   autoCategorizedCount: number;
   uncategorizedCount: number;
+  needsReviewCount: number;
   reviewUrl: string | null;
   status: string;
   sentAt: string | null;
@@ -1373,8 +1374,9 @@ export function PlaidConnectionPanel() {
                 {formatDailyReviewStatus(dailyReviewDigest.status)}
               </p>
               <p className="panelCopy">
-                {dailyReviewDigest.autoCategorizedCount} AI-categorized,{" "}
-                {dailyReviewDigest.uncategorizedCount} still waiting for review.
+                {dailyReviewDigest.needsReviewCount} transaction(s) need your
+                review: {dailyReviewDigest.autoCategorizedCount} AI-categorized and{" "}
+                {dailyReviewDigest.uncategorizedCount} still uncategorized.
               </p>
               <p className="metaLine">
                 Schedule: {formatDailyReviewHour(dailyReviewDigest.scheduledHourLocal)}{" "}

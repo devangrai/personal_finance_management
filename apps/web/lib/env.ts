@@ -28,6 +28,10 @@ type AppEnv = {
   geminiModel: string;
   dailyReviewTimezone: string;
   dailyReviewHourLocal: number;
+  resendApiKey?: string;
+  dailyReviewEmailTo?: string;
+  dailyReviewEmailFrom?: string;
+  dailyReviewEmailReplyTo?: string;
   dailyReviewWebhookUrl?: string;
   dailyReviewWebhookBearerToken?: string;
   encryptionKey: string;
@@ -111,6 +115,10 @@ export function getAppEnv(): AppEnv {
       optionalEnv("DAILY_REVIEW_HOUR_LOCAL"),
       20
     ),
+    resendApiKey: optionalEnv("RESEND_API_KEY"),
+    dailyReviewEmailTo: optionalEnv("DAILY_REVIEW_EMAIL_TO"),
+    dailyReviewEmailFrom: optionalEnv("DAILY_REVIEW_EMAIL_FROM"),
+    dailyReviewEmailReplyTo: optionalEnv("DAILY_REVIEW_EMAIL_REPLY_TO"),
     dailyReviewWebhookUrl: optionalEnv("DAILY_REVIEW_WEBHOOK_URL"),
     dailyReviewWebhookBearerToken: optionalEnv(
       "DAILY_REVIEW_WEBHOOK_BEARER_TOKEN"
