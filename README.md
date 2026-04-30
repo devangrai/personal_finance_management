@@ -118,6 +118,8 @@ Recommended env settings for this feature:
 
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL` default `gpt-4.1-mini`
+- `GEMINI_API_KEY` optional fallback or primary key
+- `GEMINI_MODEL` default `gemini-2.5-flash`
 - `DAILY_REVIEW_TIMEZONE` default `America/Los_Angeles`
 - `DAILY_REVIEW_HOUR_LOCAL` default `20`
 - `DAILY_REVIEW_WEBHOOK_URL` optional
@@ -136,7 +138,7 @@ Before testing a real OAuth institution like Capital One or Bank of America:
 6. Add that redirect URI to the Plaid Dashboard allowlist.
 7. Set `PLAID_WEBHOOK_URL` if your webhook URL differs from `NEXT_PUBLIC_APP_URL + /api/plaid/webhook`.
 8. Keep `PLAID_PRODUCTS="transactions"` until you are ready to pay for `investments`.
-9. Add `OPENAI_API_KEY` if you want AI categorization in production.
+9. Add `OPENAI_API_KEY` and/or `GEMINI_API_KEY` if you want AI categorization in production.
 10. Add `CRON_SECRET`, `DAILY_REVIEW_TIMEZONE`, and `DAILY_REVIEW_HOUR_LOCAL` before enabling nightly review pings.
 
 The first real-institution test should be one account only. That keeps reconnect, webhook, and disconnect behavior easy to inspect before you broaden coverage.

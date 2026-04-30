@@ -77,6 +77,21 @@ type CategorizeTransactionsInput = {
   today: string;
 };
 
+type GeminiGenerateContentResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+  error?: {
+    code?: number;
+    message?: string;
+    status?: string;
+  };
+};
+
 function buildSystemPrompt(categories: CategorizationCategoryOption[]) {
   return [
     "You categorize personal finance transactions into a small application taxonomy.",
@@ -132,5 +147,107 @@ export async function categorizeTransactionsWithAi(
     throw new Error("OpenAI did not return categorization suggestions.");
   }
 
+  return parsed.suggestions;
+}
+
+export async function categorizeTransactionsWithGemini(
+  input: CategorizeTransactionsInput
+): Promise<CategorizationSuggestion[]> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+      input.model
+    )}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": input.apiKey
+      },
+      body: JSON.stringify({
+        system_instruction: {
+          parts: [
+            {
+              text: buildSystemPrompt(input.categories)
+            }
+          ]
+        },
+        contents: [
+          {
+            parts: [
+              {
+                text: buildUserPrompt(input)
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseJsonSchema: {
+            type: "object",
+            properties: {
+              suggestions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    transactionId: {
+                      type: "string",
+                      description: "Transaction id from the input row."
+                    },
+                    categoryKey: {
+                      type: "string",
+                      description: "One category key from the provided taxonomy."
+                    },
+                    confidence: {
+                      type: "integer",
+                      minimum: 0,
+                      maximum: 100,
+                      description:
+                        "Confidence from 0 to 100 for the suggested category."
+                    },
+                    reason: {
+                      type: "string",
+                      description:
+                        "Short concrete rationale for the category selection."
+                    }
+                  },
+                  required: [
+                    "transactionId",
+                    "categoryKey",
+                    "confidence",
+                    "reason"
+                  ],
+                  additionalProperties: false
+                }
+              }
+            },
+            required: ["suggestions"],
+            additionalProperties: false
+          }
+        }
+      })
+    }
+  );
+
+  const payload = (await response.json()) as GeminiGenerateContentResponse;
+  if (!response.ok) {
+    throw new Error(
+      payload.error?.message ??
+        `Gemini request failed with status ${response.status}.`
+    );
+  }
+
+  const text = payload.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text ?? "")
+    .join("")
+    .trim();
+
+  if (!text) {
+    throw new Error("Gemini did not return categorization suggestions.");
+  }
+
+  const parsed = categorizationResponseSchema.parse(
+    JSON.parse(text)
+  ) as CategorizationSchema;
   return parsed.suggestions;
 }

@@ -16,7 +16,10 @@
     "ENCRYPTION_KEY",
     "DEFAULT_USER_EMAIL",
     "CRON_SECRET",
-    "OPENAI_API_KEY"
+    "OPENAI_API_KEY",
+    "OPENAI_MODEL",
+    "GEMINI_API_KEY",
+    "GEMINI_MODEL"
   ],
   "tasks": {
     "build": {

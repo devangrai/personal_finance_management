@@ -1,5 +1,6 @@
 import {
   categorizeTransactionsWithAi,
+  categorizeTransactionsWithGemini,
   type CategorizationCategoryOption,
   type CategorizationSuggestion,
   type TransactionCategorizationCandidate
@@ -36,6 +37,12 @@ type AutoCategorizeTransactionsResult = {
   model: string;
 };
 
+type CategorizationProvider = {
+  name: "openai" | "gemini";
+  apiKey: string;
+  model: string;
+};
+
 const MIN_AUTO_ASSIGN_CONFIDENCE = 78;
 
 function chunk<T>(items: T[], size: number) {
@@ -62,6 +69,80 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function buildProviderLabel(provider: CategorizationProvider) {
+  return `${provider.name}:${provider.model}`;
+}
+
+function buildProviderSequence(env: ReturnType<typeof getAppEnv>) {
+  const providers: CategorizationProvider[] = [];
+
+  if (env.openAiApiKey) {
+    providers.push({
+      name: "openai",
+      apiKey: env.openAiApiKey,
+      model: env.openAiModel
+    });
+  }
+
+  if (env.geminiApiKey) {
+    providers.push({
+      name: "gemini",
+      apiKey: env.geminiApiKey,
+      model: env.geminiModel
+    });
+  }
+
+  return providers;
+}
+
+function shouldFallbackToSecondaryProvider(error: unknown) {
+  const status =
+    typeof error === "object" && error !== null && "status" in error
+      ? Number((error as { status?: number }).status)
+      : null;
+
+  if (status === 401 || status === 403 || status === 429) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+  return (
+    message.includes("429") ||
+    message.includes("quota") ||
+    message.includes("billing") ||
+    message.includes("insufficient_quota") ||
+    message.includes("rate limit") ||
+    message.includes("api key") ||
+    message.includes("authentication")
+  );
+}
+
+async function categorizeBatchWithProvider(
+  provider: CategorizationProvider,
+  input: {
+    categories: CategorizationCategoryOption[];
+    linkedInstitutionNames: string[];
+    today: string;
+    transactions: TransactionCategorizationCandidate[];
+  }
+) {
+  if (provider.name === "gemini") {
+    return categorizeTransactionsWithGemini({
+      apiKey: provider.apiKey,
+      model: provider.model,
+      ...input
+    });
+  }
+
+  return categorizeTransactionsWithAi({
+    apiKey: provider.apiKey,
+    model: provider.model,
+    ...input
+  });
+}
+
 function buildUtcDateRange(localDateKey: string) {
   const start = new Date(`${localDateKey}T00:00:00.000Z`);
   const end = new Date(start);
@@ -77,8 +158,11 @@ export async function autoCategorizeTransactions(
   input: AutoCategorizeTransactionsInput = {}
 ): Promise<AutoCategorizeTransactionsResult> {
   const env = getAppEnv();
-  if (!env.openAiApiKey) {
-    throw new Error("OPENAI_API_KEY is required for AI categorization.");
+  const providers = buildProviderSequence(env);
+  if (providers.length === 0) {
+    throw new Error(
+      "Set OPENAI_API_KEY or GEMINI_API_KEY to enable AI categorization."
+    );
   }
 
   const userId = await getDefaultUserId();
@@ -157,7 +241,7 @@ export async function autoCategorizeTransactions(
       categorizedCount: 0,
       leftUncategorizedCount: 0,
       transactions: [],
-      model: env.openAiModel
+      model: buildProviderLabel(providers[0])
     };
   }
 
@@ -178,17 +262,48 @@ export async function autoCategorizeTransactions(
   );
 
   const suggestionMap = new Map<string, CategorizationSuggestion>();
+  let activeProviderIndex = 0;
   for (const group of chunk(candidates, 20)) {
-    const suggestions = await categorizeTransactionsWithAi({
-      apiKey: env.openAiApiKey,
-      model: env.openAiModel,
+    const batchInput = {
       categories: categoryOptions,
       linkedInstitutionNames: uniqueStrings(
         linkedInstitutions.map((item) => item.institutionName)
       ),
       today: todayKey(),
       transactions: group
-    });
+    };
+
+    let suggestions: CategorizationSuggestion[] | null = null;
+    let lastError: unknown = null;
+
+    for (
+      let providerIndex = activeProviderIndex;
+      providerIndex < providers.length;
+      providerIndex += 1
+    ) {
+      const provider = providers[providerIndex];
+
+      try {
+        suggestions = await categorizeBatchWithProvider(provider, batchInput);
+        activeProviderIndex = providerIndex;
+        break;
+      } catch (error) {
+        lastError = error;
+        const canFallback =
+          providerIndex < providers.length - 1 &&
+          shouldFallbackToSecondaryProvider(error);
+
+        if (!canFallback) {
+          throw error;
+        }
+      }
+    }
+
+    if (!suggestions) {
+      throw lastError instanceof Error
+        ? lastError
+        : new Error("AI categorization failed.");
+    }
 
     for (const suggestion of suggestions) {
       suggestionMap.set(suggestion.transactionId, suggestion);
@@ -222,7 +337,7 @@ export async function autoCategorizeTransactions(
         aiSuggestedCategoryId: assignedCategoryId,
         aiSuggestedConfidence: confidence,
         aiSuggestedReason: suggestion?.reason ?? null,
-        aiSuggestedByModel: env.openAiModel,
+        aiSuggestedByModel: buildProviderLabel(providers[activeProviderIndex]),
         aiSuggestedAt: new Date(),
         reviewStatus: shouldAutoAssign
           ? TransactionReviewStatus.auto_categorized
@@ -265,6 +380,6 @@ export async function autoCategorizeTransactions(
     categorizedCount,
     leftUncategorizedCount,
     transactions: updatedTransactions,
-    model: env.openAiModel
+    model: buildProviderLabel(providers[activeProviderIndex])
   };
 }

@@ -24,6 +24,8 @@ type AppEnv = {
   plaidRedirectUri?: string;
   openAiApiKey?: string;
   openAiModel: string;
+  geminiApiKey?: string;
+  geminiModel: string;
   dailyReviewTimezone: string;
   dailyReviewHourLocal: number;
   dailyReviewWebhookUrl?: string;
@@ -101,6 +103,8 @@ export function getAppEnv(): AppEnv {
     plaidRedirectUri: optionalEnv("PLAID_REDIRECT_URI"),
     openAiApiKey: optionalEnv("OPENAI_API_KEY"),
     openAiModel: optionalEnv("OPENAI_MODEL") ?? "gpt-4.1-mini",
+    geminiApiKey: optionalEnv("GEMINI_API_KEY"),
+    geminiModel: optionalEnv("GEMINI_MODEL") ?? "gemini-2.5-flash",
     dailyReviewTimezone:
       optionalEnv("DAILY_REVIEW_TIMEZONE") ?? "America/Los_Angeles",
     dailyReviewHourLocal: parseOptionalInt(
