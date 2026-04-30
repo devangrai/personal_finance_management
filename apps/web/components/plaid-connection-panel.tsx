@@ -132,6 +132,7 @@ type CashflowSummaryMonth = {
   month: string;
   label: string;
   income: string;
+  investing: string;
   spending: string;
   transfers: string;
   netCashflow: string;
@@ -1343,14 +1344,21 @@ export function PlaidConnectionPanel() {
                 </p>
               </article>
               <article className="summaryCard">
-                <p className="summaryLabel">Net cash flow</p>
+                <p className="summaryLabel">Saving and investing</p>
                 <p className="summaryValue">
-                  {formatCurrency(cashflowSummary.latestMonth.netCashflow)}
+                  {formatCurrency(cashflowSummary.latestMonth.investing)}
                 </p>
                 <p className="summaryMeta">
                   Transfers tracked separately:{" "}
                   {formatCurrency(cashflowSummary.latestMonth.transfers)}
                 </p>
+              </article>
+              <article className="summaryCard">
+                <p className="summaryLabel">Net cash flow</p>
+                <p className="summaryValue">
+                  {formatCurrency(cashflowSummary.latestMonth.netCashflow)}
+                </p>
+                <p className="summaryMeta">Income minus true spending</p>
               </article>
               <article className="summaryCard">
                 <p className="summaryLabel">Reviewed coverage</p>
@@ -1392,6 +1400,7 @@ export function PlaidConnectionPanel() {
                       <tr>
                         <th>Month</th>
                         <th>Income</th>
+                        <th>Investing</th>
                         <th>Spend</th>
                         <th>Net</th>
                         <th>Coverage</th>
@@ -1402,6 +1411,7 @@ export function PlaidConnectionPanel() {
                         <tr key={month.month}>
                           <td>{month.label}</td>
                           <td>{formatCurrency(month.income)}</td>
+                          <td>{formatCurrency(month.investing)}</td>
                           <td>{formatCurrency(month.spending)}</td>
                           <td>{formatCurrency(month.netCashflow)}</td>
                           <td>{(month.reviewedSpendRatioBps / 100).toFixed(0)}%</td>

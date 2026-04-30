@@ -11,6 +11,7 @@ import {
 } from "@portfolio/db";
 import { listCategories, getDefaultUserId } from "./categories";
 import { getAppEnv } from "./env";
+import { classifyTransactionDeterministically } from "./transaction-normalization";
 
 type AutoCategorizeTransactionsInput = {
   limit?: number;
@@ -71,6 +72,17 @@ function todayKey() {
 
 function buildProviderLabel(provider: CategorizationProvider) {
   return `${provider.name}:${provider.model}`;
+}
+
+function defaultCategorizationModelLabel(
+  providers: CategorizationProvider[],
+  usedDeterministicOnly = false
+) {
+  if (usedDeterministicOnly || providers.length === 0) {
+    return "heuristic:ruleset-v1";
+  }
+
+  return buildProviderLabel(providers[0]);
 }
 
 function buildProviderSequence(env: ReturnType<typeof getAppEnv>) {
@@ -159,12 +171,6 @@ export async function autoCategorizeTransactions(
 ): Promise<AutoCategorizeTransactionsResult> {
   const env = getAppEnv();
   const providers = buildProviderSequence(env);
-  if (providers.length === 0) {
-    throw new Error(
-      "Set OPENAI_API_KEY or GEMINI_API_KEY to enable AI categorization."
-    );
-  }
-
   const userId = await getDefaultUserId();
   const categories = await listCategories();
   const categoryOptions: CategorizationCategoryOption[] = categories.map((category) => ({
@@ -241,7 +247,7 @@ export async function autoCategorizeTransactions(
       categorizedCount: 0,
       leftUncategorizedCount: 0,
       transactions: [],
-      model: buildProviderLabel(providers[0])
+      model: defaultCategorizationModelLabel(providers)
     };
   }
 
@@ -261,9 +267,35 @@ export async function autoCategorizeTransactions(
     })
   );
 
+  const deterministicAssignments = new Map<
+    string,
+    ReturnType<typeof classifyTransactionDeterministically>
+  >();
+  const aiCandidates = candidates.filter((candidate) => {
+    const assignment = classifyTransactionDeterministically({
+      candidate,
+      linkedInstitutionNames: uniqueStrings(
+        linkedInstitutions.map((item) => item.institutionName)
+      )
+    });
+
+    if (assignment) {
+      deterministicAssignments.set(candidate.id, assignment);
+      return false;
+    }
+
+    return true;
+  });
+
   const suggestionMap = new Map<string, CategorizationSuggestion>();
   let activeProviderIndex = 0;
-  for (const group of chunk(candidates, 20)) {
+  if (aiCandidates.length > 0 && providers.length === 0) {
+    throw new Error(
+      "Set OPENAI_API_KEY or GEMINI_API_KEY to categorize transactions beyond the built-in heuristics."
+    );
+  }
+
+  for (const group of chunk(aiCandidates, 20)) {
     const batchInput = {
       categories: categoryOptions,
       linkedInstitutionNames: uniqueStrings(
@@ -315,13 +347,18 @@ export async function autoCategorizeTransactions(
   let leftUncategorizedCount = 0;
 
   for (const candidate of candidates) {
+    const deterministicAssignment = deterministicAssignments.get(candidate.id);
     const suggestion = suggestionMap.get(candidate.id);
-    const normalizedCategoryKey = suggestion?.categoryKey?.trim().toLowerCase();
+    const normalizedCategoryKey = deterministicAssignment
+      ? deterministicAssignment.categoryKey
+      : suggestion?.categoryKey?.trim().toLowerCase();
     const assignedCategoryId =
       normalizedCategoryKey && categoryIdByKey.has(normalizedCategoryKey)
         ? categoryIdByKey.get(normalizedCategoryKey) ?? null
         : null;
-    const confidence = suggestion?.confidence ?? null;
+    const confidence = deterministicAssignment
+      ? deterministicAssignment.confidence
+      : suggestion?.confidence ?? null;
     const shouldAutoAssign =
       assignedCategoryId !== null &&
       normalizedCategoryKey !== "uncategorized" &&
@@ -336,8 +373,10 @@ export async function autoCategorizeTransactions(
         categoryId: shouldAutoAssign ? assignedCategoryId : null,
         aiSuggestedCategoryId: assignedCategoryId,
         aiSuggestedConfidence: confidence,
-        aiSuggestedReason: suggestion?.reason ?? null,
-        aiSuggestedByModel: buildProviderLabel(providers[activeProviderIndex]),
+        aiSuggestedReason: deterministicAssignment?.reason ?? suggestion?.reason ?? null,
+        aiSuggestedByModel: deterministicAssignment
+          ? "heuristic:ruleset-v1"
+          : buildProviderLabel(providers[activeProviderIndex]),
         aiSuggestedAt: new Date(),
         reviewStatus: shouldAutoAssign
           ? TransactionReviewStatus.auto_categorized
@@ -369,8 +408,8 @@ export async function autoCategorizeTransactions(
       merchantName: updated.merchantName,
       assignedCategoryKey: updated.category?.key ?? null,
       assignedCategoryLabel: updated.category?.label ?? null,
-      confidence: suggestion?.confidence ?? null,
-      reason: suggestion?.reason ?? null,
+      confidence,
+      reason: deterministicAssignment?.reason ?? suggestion?.reason ?? null,
       reviewStatus: updated.reviewStatus
     });
   }
@@ -380,6 +419,9 @@ export async function autoCategorizeTransactions(
     categorizedCount,
     leftUncategorizedCount,
     transactions: updatedTransactions,
-    model: buildProviderLabel(providers[activeProviderIndex])
+    model:
+      aiCandidates.length === 0
+        ? defaultCategorizationModelLabel(providers, true)
+        : buildProviderLabel(providers[activeProviderIndex])
   };
 }

@@ -1,5 +1,6 @@
 import { prisma, TransactionReviewStatus } from "@portfolio/db";
 import { ensureDefaultCategories, getDefaultUserId } from "./categories";
+import { classifyTransactionDeterministically } from "./transaction-normalization";
 
 type SummaryCategory = {
   amountCents: number;
@@ -9,6 +10,7 @@ type SummaryCategory = {
 
 type MonthlyAccumulator = {
   incomeCents: number;
+  investingCents: number;
   netCashflowCents: number;
   reviewedTransactionCount: number;
   spendingByCategory: Map<string, SummaryCategory>;
@@ -41,6 +43,7 @@ function formatMonthLabel(monthKey: string) {
 function createEmptyAccumulator(): MonthlyAccumulator {
   return {
     incomeCents: 0,
+    investingCents: 0,
     netCashflowCents: 0,
     reviewedTransactionCount: 0,
     spendingByCategory: new Map(),
@@ -103,7 +106,22 @@ export async function getCashflowSummary(months = 6) {
       amount: true,
       date: true,
       direction: true,
+      name: true,
+      merchantName: true,
+      personalFinanceCategory: true,
       reviewStatus: true,
+      account: {
+        select: {
+          name: true,
+          type: true,
+          subtype: true,
+          plaidItem: {
+            select: {
+              institutionName: true
+            }
+          }
+        }
+      },
       category: {
         select: {
           key: true,
@@ -120,14 +138,32 @@ export async function getCashflowSummary(months = 6) {
     },
     select: {
       key: true,
-      label: true
+      label: true,
+      parentKey: true
     }
   });
   const categoryLabelByKey = new Map<string, string>(
-    categoryLabels.map((category: { key: string; label: string }) => [
+    categoryLabels.map(
+      (category: { key: string; label: string; parentKey: string | null }) => [
+        category.key,
+        category.label
+      ]
+    )
+  );
+  const categoryParentByKey = new Map<string, string | null>(
+    categoryLabels.map(
+      (category: { key: string; label: string; parentKey: string | null }) => [
       category.key,
-      category.label
-    ])
+      category.parentKey
+      ]
+    )
+  );
+  const linkedInstitutionNames = Array.from(
+    new Set(
+      transactions
+        .map((transaction) => transaction.account.plaidItem.institutionName)
+        .filter((institutionName): institutionName is string => Boolean(institutionName))
+    )
   );
 
   const summaryByMonth = new Map<string, MonthlyAccumulator>();
@@ -155,7 +191,28 @@ export async function getCashflowSummary(months = 6) {
 
     accumulator.reviewedTransactionCount += 1;
 
-    const topLevelKey = transaction.category.parentKey ?? transaction.category.key;
+    const heuristicAssignment =
+      transaction.reviewStatus === TransactionReviewStatus.auto_categorized
+        ? classifyTransactionDeterministically({
+            candidate: {
+              name: transaction.name,
+              merchantName: transaction.merchantName,
+              direction: transaction.direction,
+              personalFinanceCategory: transaction.personalFinanceCategory,
+              accountName: transaction.account.name,
+              accountType: transaction.account.type,
+              accountSubtype: transaction.account.subtype,
+              institutionName: transaction.account.plaidItem.institutionName
+            },
+            linkedInstitutionNames
+          })
+        : null;
+    const heuristicTopLevelKey = heuristicAssignment
+      ? categoryParentByKey.get(heuristicAssignment.categoryKey) ??
+        heuristicAssignment.categoryKey
+      : null;
+    const topLevelKey =
+      heuristicTopLevelKey ?? transaction.category.parentKey ?? transaction.category.key;
     const topLevelLabel =
       categoryLabelByKey.get(topLevelKey) ?? transaction.category.label;
 
@@ -167,6 +224,11 @@ export async function getCashflowSummary(months = 6) {
 
     if (topLevelKey === "transfer") {
       accumulator.transferCents += amountCents;
+      continue;
+    }
+
+    if (topLevelKey === "investing") {
+      accumulator.investingCents += amountCents;
       continue;
     }
 
@@ -221,6 +283,7 @@ export async function getCashflowSummary(months = 6) {
         month: monthKey,
         label: formatMonthLabel(monthKey),
         income: (accumulator.incomeCents / 100).toFixed(2),
+        investing: (accumulator.investingCents / 100).toFixed(2),
         spending: (accumulator.spendingCents / 100).toFixed(2),
         transfers: (accumulator.transferCents / 100).toFixed(2),
         netCashflow: (accumulator.netCashflowCents / 100).toFixed(2),
