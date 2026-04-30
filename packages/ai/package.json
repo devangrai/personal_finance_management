@@ -2,6 +2,10 @@
   "name": "@portfolio/ai",
   "private": true,
   "version": "0.1.0",
+  "dependencies": {
+    "openai": "^6.3.0",
+    "zod": "^3.24.1"
+  },
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "typecheck": "tsc --project tsconfig.json --noEmit"

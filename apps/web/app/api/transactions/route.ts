@@ -3,12 +3,14 @@ import { listRecentTransactions } from "@/lib/transactions";
 
 export async function GET(request: NextRequest) {
   const limitValue = request.nextUrl.searchParams.get("limit");
+  const dateValue = request.nextUrl.searchParams.get("date");
   const limit = limitValue ? Number(limitValue) : 50;
 
   try {
-    const transactions = await listRecentTransactions(
-      Number.isFinite(limit) && limit > 0 ? Math.min(limit, 200) : 50
-    );
+    const transactions = await listRecentTransactions({
+      limit: Number.isFinite(limit) && limit > 0 ? Math.min(limit, 200) : 50,
+      localDateKey: dateValue
+    });
 
     return NextResponse.json({
       transactions

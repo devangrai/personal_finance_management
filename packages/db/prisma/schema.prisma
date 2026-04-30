@@ -65,6 +65,13 @@ enum RecommendationRunStatus {
   partial
 }
 
+enum DailyReviewDigestStatus {
+  pending
+  sent
+  acknowledged
+  failed
+}
+
 enum RecurrenceFrequency {
   weekly
   biweekly
@@ -104,6 +111,7 @@ model User {
   holdingSnapshots   HoldingSnapshot[]
   investmentTxns     InvestmentTransaction[]
   recommendationRuns RecommendationRun[]
+  dailyReviewDigests DailyReviewDigest[]
 }
 
 model UserProfile {
@@ -181,6 +189,7 @@ model TransactionCategory {
   updatedAt  DateTime          @updatedAt
   user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
+  aiSuggestedTransactions Transaction[] @relation("AiSuggestedTransactionCategory")
   rules      TransactionRule[]
 
   @@unique([userId, key])
@@ -203,6 +212,11 @@ model Transaction {
   plaidCategory             Json?
   personalFinanceCategory   String?
   categoryId                String?
+  aiSuggestedCategoryId     String?
+  aiSuggestedConfidence     Int?
+  aiSuggestedReason         String?
+  aiSuggestedByModel        String?
+  aiSuggestedAt             DateTime?
   reviewStatus              TransactionReviewStatus  @default(uncategorized)
   notes                     String?
   createdAt                 DateTime                 @default(now())
@@ -210,10 +224,35 @@ model Transaction {
   user                      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   account                   Account                  @relation(fields: [accountId], references: [id], onDelete: Cascade)
   category                  TransactionCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  aiSuggestedCategory       TransactionCategory?     @relation("AiSuggestedTransactionCategory", fields: [aiSuggestedCategoryId], references: [id], onDelete: SetNull)
 
   @@index([userId, date])
   @@index([accountId, date])
   @@index([categoryId, date])
+  @@index([aiSuggestedCategoryId, date])
+}
+
+model DailyReviewDigest {
+  id                   String                  @id @default(cuid())
+  userId               String
+  localDateKey         String
+  timezone             String
+  scheduledHourLocal   Int
+  transactionCount     Int                     @default(0)
+  autoCategorizedCount Int                     @default(0)
+  uncategorizedCount   Int                     @default(0)
+  reviewUrl            String?
+  pingSummary          String?
+  status               DailyReviewDigestStatus @default(pending)
+  sentAt               DateTime?
+  acknowledgedAt       DateTime?
+  lastError            String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, localDateKey])
+  @@index([userId, status])
 }
 
 model TransactionRule {

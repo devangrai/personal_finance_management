@@ -22,8 +22,15 @@ type AppEnv = {
   plaidCountryCodes: CountryCode[];
   plaidProducts: Products[];
   plaidRedirectUri?: string;
+  openAiApiKey?: string;
+  openAiModel: string;
+  dailyReviewTimezone: string;
+  dailyReviewHourLocal: number;
+  dailyReviewWebhookUrl?: string;
+  dailyReviewWebhookBearerToken?: string;
   encryptionKey: string;
   defaultUserEmail: string;
+  cronSecret?: string;
 };
 
 const supportedPlaidEnvironments = new Set<PlaidEnvironmentName>([
@@ -44,6 +51,15 @@ function requireEnv(name: string) {
 function optionalEnv(name: string) {
   const value = process.env[name]?.trim();
   return value ? value : undefined;
+}
+
+function parseOptionalInt(value: string | undefined, fallback: number) {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function resolvePlaidSecret(plaidEnv: PlaidEnvironmentName) {
@@ -83,8 +99,21 @@ export function getAppEnv(): AppEnv {
     ),
     plaidProducts: parsePlaidProducts(optionalEnv("PLAID_PRODUCTS")),
     plaidRedirectUri: optionalEnv("PLAID_REDIRECT_URI"),
+    openAiApiKey: optionalEnv("OPENAI_API_KEY"),
+    openAiModel: optionalEnv("OPENAI_MODEL") ?? "gpt-4.1-mini",
+    dailyReviewTimezone:
+      optionalEnv("DAILY_REVIEW_TIMEZONE") ?? "America/Los_Angeles",
+    dailyReviewHourLocal: parseOptionalInt(
+      optionalEnv("DAILY_REVIEW_HOUR_LOCAL"),
+      20
+    ),
+    dailyReviewWebhookUrl: optionalEnv("DAILY_REVIEW_WEBHOOK_URL"),
+    dailyReviewWebhookBearerToken: optionalEnv(
+      "DAILY_REVIEW_WEBHOOK_BEARER_TOKEN"
+    ),
     encryptionKey: requireEnv("ENCRYPTION_KEY"),
     defaultUserEmail:
-      optionalEnv("DEFAULT_USER_EMAIL") ?? "owner@example.com"
+      optionalEnv("DEFAULT_USER_EMAIL") ?? "owner@example.com",
+    cronSecret: optionalEnv("CRON_SECRET")
   };
 }

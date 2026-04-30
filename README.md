@@ -87,10 +87,42 @@ The frontend currently supports:
 - disconnecting an Item
 - reviewing and editing transaction categories
 - creating merchant-based categorization rules
+- AI-assisted transaction categorization for the next 50-100 uncategorized rows
 - monthly cash flow summaries
 - recurring inflow and outflow detection
+- a nightly daily-review digest that can ping a webhook at a scheduled local hour
 
 The current implementation assumes a single bootstrap user derived from `DEFAULT_USER_EMAIL`. That keeps Item and account persistence deterministic until application auth is added.
+
+## AI review loop
+
+The current app can run an LLM review pass over uncategorized transactions and store:
+
+- the suggested category
+- confidence
+- short reasoning
+- the model used
+- when the suggestion was made
+
+Auto-assignment is intentionally conservative. Higher-confidence suggestions are applied directly and marked `auto_categorized`; weaker suggestions stay uncategorized so the user can validate them manually.
+
+For the daily review loop:
+
+- Vercel cron runs hourly
+- the app checks `DAILY_REVIEW_TIMEZONE` and `DAILY_REVIEW_HOUR_LOCAL` internally
+- at the scheduled local hour, the app auto-categorizes that day’s uncategorized transactions
+- it persists a `DailyReviewDigest`
+- it can optionally send a webhook ping using `DAILY_REVIEW_WEBHOOK_URL`
+
+Recommended env settings for this feature:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL` default `gpt-4.1-mini`
+- `DAILY_REVIEW_TIMEZONE` default `America/Los_Angeles`
+- `DAILY_REVIEW_HOUR_LOCAL` default `20`
+- `DAILY_REVIEW_WEBHOOK_URL` optional
+- `DAILY_REVIEW_WEBHOOK_BEARER_TOKEN` optional
+- `CRON_SECRET` for the Vercel cron endpoint
 
 ## Production checklist
 
@@ -104,6 +136,8 @@ Before testing a real OAuth institution like Capital One or Bank of America:
 6. Add that redirect URI to the Plaid Dashboard allowlist.
 7. Set `PLAID_WEBHOOK_URL` if your webhook URL differs from `NEXT_PUBLIC_APP_URL + /api/plaid/webhook`.
 8. Keep `PLAID_PRODUCTS="transactions"` until you are ready to pay for `investments`.
+9. Add `OPENAI_API_KEY` if you want AI categorization in production.
+10. Add `CRON_SECRET`, `DAILY_REVIEW_TIMEZONE`, and `DAILY_REVIEW_HOUR_LOCAL` before enabling nightly review pings.
 
 The first real-institution test should be one account only. That keeps reconnect, webhook, and disconnect behavior easy to inspect before you broaden coverage.
 

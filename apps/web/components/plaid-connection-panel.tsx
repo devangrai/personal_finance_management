@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   type PlaidLinkError,
   type PlaidLinkOnExitMetadata,
@@ -72,7 +73,16 @@ type RecentTransaction = {
   isPending: boolean;
   personalFinanceCategory: string | null;
   reviewStatus: string;
+  aiSuggestedConfidence: number | null;
+  aiSuggestedReason: string | null;
+  aiSuggestedByModel: string | null;
+  aiSuggestedAt: string | null;
   category: {
+    id: string;
+    key: string;
+    label: string;
+  } | null;
+  aiSuggestedCategory: {
     id: string;
     key: string;
     label: string;
@@ -170,6 +180,46 @@ type RecurringSummaryResponse = {
   outflows: RecurringCandidate[];
 };
 
+type DailyReviewDigest = {
+  id: string;
+  localDateKey: string;
+  timezone: string;
+  scheduledHourLocal: number;
+  transactionCount: number;
+  autoCategorizedCount: number;
+  uncategorizedCount: number;
+  reviewUrl: string | null;
+  status: string;
+  sentAt: string | null;
+  acknowledgedAt: string | null;
+  lastError: string | null;
+};
+
+type LatestDailyReviewDigestResponse = {
+  digest: DailyReviewDigest | null;
+};
+
+type DailyReviewRunResponse = {
+  localDateKey: string;
+  timezone: string;
+  scheduledHourLocal: number;
+  status: "skipped" | "created" | "updated";
+  digest: DailyReviewDigest | null;
+  categorization: {
+    attemptedCount: number;
+    categorizedCount: number;
+    leftUncategorizedCount: number;
+    model: string | null;
+  } | null;
+};
+
+type AutoCategorizeResponse = {
+  attemptedCount: number;
+  categorizedCount: number;
+  leftUncategorizedCount: number;
+  model: string;
+};
+
 const plaidSetupSteps = [
   "Create a free Plaid developer account and open the Dashboard.",
   "Copy your Sandbox client_id and secret into the app .env file.",
@@ -255,6 +305,30 @@ function formatPlaidItemStatus(status: string) {
   }
 }
 
+function formatDailyReviewStatus(status: string) {
+  switch (status) {
+    case "sent":
+      return "Ping delivered";
+    case "acknowledged":
+      return "Acknowledged";
+    case "failed":
+      return "Ping failed";
+    default:
+      return "Pending review";
+  }
+}
+
+function formatDailyReviewHour(hour: number) {
+  const normalizedHour = ((hour % 24) + 24) % 24;
+  const date = new Date(Date.UTC(2026, 0, 1, normalizedHour, 0, 0));
+
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC"
+  }).format(date);
+}
+
 function PlaidLinkLauncher({
   linkToken,
   linkSession,
@@ -290,6 +364,8 @@ function PlaidLinkLauncher({
 }
 
 export function PlaidConnectionPanel() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
@@ -297,12 +373,15 @@ export function PlaidConnectionPanel() {
     useState<CashflowSummaryResponse | null>(null);
   const [recurringSummary, setRecurringSummary] =
     useState<RecurringSummaryResponse | null>(null);
+  const [dailyReviewDigest, setDailyReviewDigest] =
+    useState<DailyReviewDigest | null>(null);
   const [userEmail, setUserEmail] = useState<string>("owner@example.com");
   const [accountsError, setAccountsError] = useState<string | null>(null);
   const [transactionsError, setTransactionsError] = useState<string | null>(null);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [cashflowError, setCashflowError] = useState<string | null>(null);
   const [recurringError, setRecurringError] = useState<string | null>(null);
+  const [dailyReviewError, setDailyReviewError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [linkSession, setLinkSession] = useState<StoredPlaidLinkSession | null>(null);
@@ -310,8 +389,11 @@ export function PlaidConnectionPanel() {
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [isLoadingCashflow, setIsLoadingCashflow] = useState(true);
   const [isLoadingRecurring, setIsLoadingRecurring] = useState(true);
+  const [isLoadingDailyReview, setIsLoadingDailyReview] = useState(true);
   const [isCreatingLinkToken, setIsCreatingLinkToken] = useState(false);
   const [isSyncingTransactions, setIsSyncingTransactions] = useState(false);
+  const [isAutoCategorizing, setIsAutoCategorizing] = useState(false);
+  const [isRunningDailyReview, setIsRunningDailyReview] = useState(false);
   const [disconnectingPlaidItemId, setDisconnectingPlaidItemId] = useState<
     string | null
   >(null);
@@ -322,6 +404,8 @@ export function PlaidConnectionPanel() {
   const [pendingOpen, setPendingOpen] = useState(false);
   const [isLinkReady, setIsLinkReady] = useState(false);
   const [linkLauncherKey, setLinkLauncherKey] = useState(0);
+  const reviewDate = searchParams.get("reviewDate");
+  const transactionLimit = reviewDate ? 100 : 25;
 
   async function refreshAccounts() {
     setIsLoadingAccounts(true);
@@ -355,7 +439,14 @@ export function PlaidConnectionPanel() {
     setTransactionsError(null);
 
     try {
-      const response = await fetch("/api/transactions?limit=25", {
+      const params = new URLSearchParams({
+        limit: String(transactionLimit)
+      });
+      if (reviewDate) {
+        params.set("date", reviewDate);
+      }
+
+      const response = await fetch(`/api/transactions?${params.toString()}`, {
         method: "GET"
       });
       const payload = (await response.json()) as TransactionsResponse & {
@@ -451,13 +542,45 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  async function refreshDailyReviewDigest() {
+    setIsLoadingDailyReview(true);
+    setDailyReviewError(null);
+
+    try {
+      const response = await fetch("/api/daily-review/latest", {
+        method: "GET"
+      });
+      const payload = (await response.json()) as LatestDailyReviewDigestResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to load the daily review digest.");
+      }
+
+      setDailyReviewDigest(payload.digest);
+    } catch (error) {
+      setDailyReviewError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load the daily review digest."
+      );
+    } finally {
+      setIsLoadingDailyReview(false);
+    }
+  }
+
   useEffect(() => {
     void refreshAccounts();
-    void refreshTransactions();
     void refreshCategories();
     void refreshCashflowSummary();
     void refreshRecurringSummary();
+    void refreshDailyReviewDigest();
   }, []);
+
+  useEffect(() => {
+    void refreshTransactions();
+  }, [reviewDate]);
 
   const linkedItems = useMemo(() => {
     const items = new Map<string, PlaidItemSummary>();
@@ -533,6 +656,7 @@ export function PlaidConnectionPanel() {
     await refreshTransactions();
     await refreshCashflowSummary();
     await refreshRecurringSummary();
+    await refreshDailyReviewDigest();
     clearLinkState();
   }
 
@@ -625,6 +749,7 @@ export function PlaidConnectionPanel() {
       await Promise.all([refreshAccounts(), refreshTransactions()]);
       await refreshCashflowSummary();
       await refreshRecurringSummary();
+      await refreshDailyReviewDigest();
       const failureSuffix =
         payload.failedItems && payload.failedItems.length > 0
           ? ` ${payload.failedItems.length} institution(s) still need attention.`
@@ -666,6 +791,7 @@ export function PlaidConnectionPanel() {
       await refreshTransactions();
       await refreshCashflowSummary();
       await refreshRecurringSummary();
+      await refreshDailyReviewDigest();
       setStatusMessage(`${institutionName} was disconnected and removed.`);
     } catch (error) {
       setStatusMessage(
@@ -712,6 +838,9 @@ export function PlaidConnectionPanel() {
             : transaction
         )
       );
+      await refreshCashflowSummary();
+      await refreshRecurringSummary();
+      await refreshDailyReviewDigest();
       setStatusMessage("Transaction category updated.");
     } catch (error) {
       setStatusMessage(
@@ -722,6 +851,105 @@ export function PlaidConnectionPanel() {
     } finally {
       setSavingTransactionId(null);
     }
+  }
+
+  async function handleAutoCategorizeTransactions() {
+    setIsAutoCategorizing(true);
+    setStatusMessage(
+      reviewDate
+        ? `Running AI review for transactions on ${reviewDate}...`
+        : "Running AI review for the newest uncategorized transactions..."
+    );
+
+    try {
+      const response = await fetch("/api/transactions/auto-categorize", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          limit: reviewDate ? 100 : 75,
+          localDateKey: reviewDate
+        })
+      });
+      const payload = (await response.json()) as AutoCategorizeResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to auto-categorize transactions.");
+      }
+
+      await refreshTransactions();
+      await refreshCashflowSummary();
+      await refreshRecurringSummary();
+      await refreshDailyReviewDigest();
+      setStatusMessage(
+        `AI reviewed ${payload.attemptedCount} transaction(s) with ${payload.model}. ` +
+          `${payload.categorizedCount} were auto-categorized and ` +
+          `${payload.leftUncategorizedCount} still need a manual look.`
+      );
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to auto-categorize transactions."
+      );
+    } finally {
+      setIsAutoCategorizing(false);
+    }
+  }
+
+  async function handleRunDailyReview(sendPing = false) {
+    setIsRunningDailyReview(true);
+    setStatusMessage(
+      sendPing
+        ? "Running the daily review cycle and sending the ping..."
+        : "Running the daily review cycle..."
+    );
+
+    try {
+      const response = await fetch("/api/daily-review/run", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          sendPing
+        })
+      });
+      const payload = (await response.json()) as DailyReviewRunResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to run the daily review cycle.");
+      }
+
+      await refreshTransactions();
+      await refreshCashflowSummary();
+      await refreshRecurringSummary();
+      await refreshDailyReviewDigest();
+      setStatusMessage(
+        payload.status === "skipped"
+          ? `Daily review skipped because it is not ${formatDailyReviewHour(payload.scheduledHourLocal)} ${payload.timezone} yet.`
+          : `Daily review ready for ${payload.localDateKey}. ` +
+            `${payload.categorization?.categorizedCount ?? 0} transactions were auto-categorized and ` +
+            `${payload.digest?.uncategorizedCount ?? 0} still need review.`
+      );
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to run the daily review cycle."
+      );
+    } finally {
+      setIsRunningDailyReview(false);
+    }
+  }
+
+  function clearReviewDateFilter() {
+    router.replace("/");
   }
 
   async function handleCreateRule(transactionId: string) {
@@ -742,6 +970,7 @@ export function PlaidConnectionPanel() {
       await refreshTransactions();
       await refreshCashflowSummary();
       await refreshRecurringSummary();
+      await refreshDailyReviewDigest();
       setStatusMessage(
         payload.existed
           ? `Rule already existed. Reapplied to ${payload.appliedCount} matching transactions.`
@@ -846,6 +1075,61 @@ export function PlaidConnectionPanel() {
           <p className="metaLine">
             Link ready: {isLinkReady ? "yes" : linkToken ? "loading" : "not started"}
           </p>
+        </article>
+
+        <article className="card">
+          <h3>AI daily review loop</h3>
+          {isLoadingDailyReview ? (
+            <p className="panelCopy">Loading the latest review digest...</p>
+          ) : dailyReviewError ? (
+            <p className="errorLine">{dailyReviewError}</p>
+          ) : dailyReviewDigest ? (
+            <>
+              <p className="metaLine">
+                Latest digest: {dailyReviewDigest.localDateKey} ·{" "}
+                {formatDailyReviewStatus(dailyReviewDigest.status)}
+              </p>
+              <p className="panelCopy">
+                {dailyReviewDigest.autoCategorizedCount} AI-categorized,{" "}
+                {dailyReviewDigest.uncategorizedCount} still waiting for review.
+              </p>
+              <p className="metaLine">
+                Schedule: {formatDailyReviewHour(dailyReviewDigest.scheduledHourLocal)}{" "}
+                {dailyReviewDigest.timezone}
+              </p>
+            </>
+          ) : (
+            <p className="panelCopy">
+              No digest yet. The first one appears after an AI review cycle or the
+              nightly cron run.
+            </p>
+          )}
+          <div className="buttonRow">
+            <button
+              className="secondaryButton"
+              disabled={isAutoCategorizing || isRunningDailyReview}
+              onClick={() => void handleAutoCategorizeTransactions()}
+              type="button"
+            >
+              {isAutoCategorizing ? "Reviewing..." : "AI review uncategorized"}
+            </button>
+            <button
+              className="secondaryButton"
+              disabled={isAutoCategorizing || isRunningDailyReview}
+              onClick={() => void handleRunDailyReview(false)}
+              type="button"
+            >
+              {isRunningDailyReview ? "Running..." : "Run today’s review"}
+            </button>
+            <button
+              className="secondaryButton"
+              disabled={isAutoCategorizing || isRunningDailyReview}
+              onClick={() => void handleRunDailyReview(true)}
+              type="button"
+            >
+              {isRunningDailyReview ? "Running..." : "Run and ping now"}
+            </button>
+          </div>
         </article>
       </div>
 
@@ -1147,14 +1431,32 @@ export function PlaidConnectionPanel() {
 
       <div className="transactionsBlock">
         <div className="accountsHeader">
-          <h3>Recent transactions</h3>
-          <button
-            className="secondaryButton"
-            onClick={() => void refreshTransactions()}
-            type="button"
-          >
-            Refresh transactions
-          </button>
+          <div>
+            <h3>{reviewDate ? `Transactions for ${reviewDate}` : "Recent transactions"}</h3>
+            <p className="panelCopy">
+              {reviewDate
+                ? "This is the date-filtered review view linked from the nightly reminder. Validate the AI suggestions, correct anything weak, and save rules where the pattern is durable."
+                : "The newest transactions show both the active review category and the model’s latest suggestion so you can move quickly without losing the reasoning trail."}
+            </p>
+          </div>
+          <div className="buttonRow">
+            {reviewDate ? (
+              <button
+                className="secondaryButton"
+                onClick={clearReviewDateFilter}
+                type="button"
+              >
+                Clear day filter
+              </button>
+            ) : null}
+            <button
+              className="secondaryButton"
+              onClick={() => void refreshTransactions()}
+              type="button"
+            >
+              Refresh transactions
+            </button>
+          </div>
         </div>
 
         {isLoadingTransactions ? (
@@ -1238,6 +1540,19 @@ export function PlaidConnectionPanel() {
                               ? "Reviewed manually"
                               : "Needs review"}
                         </span>
+                        {transaction.aiSuggestedCategory ? (
+                          <span className="tableSecondary">
+                            AI suggestion: {transaction.aiSuggestedCategory.label}
+                            {transaction.aiSuggestedConfidence !== null
+                              ? ` (${transaction.aiSuggestedConfidence}%)`
+                              : ""}
+                          </span>
+                        ) : null}
+                        {transaction.aiSuggestedReason ? (
+                          <span className="tableSecondary">
+                            {transaction.aiSuggestedReason}
+                          </span>
+                        ) : null}
                       </div>
                     </td>
                     <td>

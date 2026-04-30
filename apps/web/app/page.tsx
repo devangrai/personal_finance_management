@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { PlaidConnectionPanel } from "@/components/plaid-connection-panel";
 
 const layers = [
@@ -58,7 +59,16 @@ export default function HomePage() {
         </ul>
       </section>
 
-      <PlaidConnectionPanel />
+      <Suspense
+        fallback={
+          <section className="panel">
+            <h2>Connect and inspect linked accounts</h2>
+            <p className="panelCopy">Loading Plaid dashboard...</p>
+          </section>
+        }
+      >
+        <PlaidConnectionPanel />
+      </Suspense>
     </main>
   );
 }

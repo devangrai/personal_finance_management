@@ -60,6 +60,16 @@ export const RuleMatchType = {
 export type RuleMatchType =
   (typeof RuleMatchType)[keyof typeof RuleMatchType];
 
+export const DailyReviewDigestStatus = {
+  pending: "pending",
+  sent: "sent",
+  acknowledged: "acknowledged",
+  failed: "failed"
+} as const;
+
+export type DailyReviewDigestStatus =
+  (typeof DailyReviewDigestStatus)[keyof typeof DailyReviewDigestStatus];
+
 declare global {
   // eslint-disable-next-line no-var
   var __portfolioPrisma__: PrismaClient | undefined;
