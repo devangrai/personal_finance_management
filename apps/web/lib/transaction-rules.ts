@@ -26,6 +26,19 @@ type RuleBackfillTransaction = {
 
 type ActiveRule = Awaited<ReturnType<typeof getActiveTransactionRules>>[number];
 
+export type TransactionRuleSuggestion = {
+  id: string;
+  matchType: "merchant_name" | "transaction_name";
+  matchValue: string;
+  categoryId: string;
+  categoryKey: string;
+  categoryLabel: string;
+  occurrenceCount: number;
+  sampleTransactionIds: string[];
+  sampleDescription: string;
+  reason: string;
+};
+
 function normalizeValue(value: string) {
   return value.trim().toLocaleLowerCase();
 }
@@ -201,6 +214,72 @@ async function applyRuleToMatchingTransactions(rule: ActiveRule & { userId?: str
   return response.count;
 }
 
+async function createOrReuseRule(input: {
+  userId: string;
+  matchType: RuleMatchType;
+  matchValue: string;
+  categoryId: string;
+  categoryLabel: string;
+}) {
+  const existingRule = await prisma.transactionRule.findFirst({
+    where: {
+      userId: input.userId,
+      isActive: true,
+      matchType: input.matchType,
+      matchValue: input.matchValue,
+      categoryId: input.categoryId,
+      accountId: null
+    },
+    select: {
+      id: true,
+      name: true,
+      priority: true,
+      isActive: true,
+      matchType: true,
+      matchValue: true,
+      categoryId: true,
+      accountId: true
+    }
+  });
+
+  const rule =
+    existingRule ??
+    (await prisma.transactionRule.create({
+      data: {
+        userId: input.userId,
+        name: ruleDisplayName(
+          input.matchType,
+          input.matchValue,
+          input.categoryLabel
+        ),
+        matchType: input.matchType,
+        matchValue: input.matchValue,
+        categoryId: input.categoryId
+      },
+      select: {
+        id: true,
+        name: true,
+        priority: true,
+        isActive: true,
+        matchType: true,
+        matchValue: true,
+        categoryId: true,
+        accountId: true
+      }
+    }));
+
+  const appliedCount = await applyRuleToMatchingTransactions({
+    ...rule,
+    userId: input.userId
+  });
+
+  return {
+    existed: Boolean(existingRule),
+    appliedCount,
+    rule
+  };
+}
+
 export async function createRuleFromTransaction(input: { transactionId: string }) {
   const userId = await getDefaultUserId();
   const transaction = await prisma.transaction.findFirst({
@@ -237,57 +316,190 @@ export async function createRuleFromTransaction(input: { transactionId: string }
     : RuleMatchType.transaction_name;
   const matchValue = transaction.merchantName ?? transaction.name;
 
-  const existingRule = await prisma.transactionRule.findFirst({
+  return createOrReuseRule({
+    userId,
+    matchType,
+    matchValue,
+    categoryId: transaction.categoryId,
+    categoryLabel: transaction.category.label
+  });
+}
+
+function buildSuggestionReason(
+  matchType: "merchant_name" | "transaction_name",
+  occurrenceCount: number
+) {
+  if (matchType === RuleMatchType.merchant_name) {
+    return `Merchant repeated ${occurrenceCount} times with the same reviewed category.`;
+  }
+
+  return `Description repeated ${occurrenceCount} times with the same reviewed category.`;
+}
+
+function buildSuggestionKey(input: {
+  matchType: "merchant_name" | "transaction_name";
+  matchValue: string;
+  categoryId: string;
+}) {
+  return `${input.matchType}::${normalizeValue(input.matchValue)}::${input.categoryId}`;
+}
+
+export async function listSuggestedTransactionRules() {
+  const userId = await getDefaultUserId();
+  const activeRules = await getActiveTransactionRules(userId);
+  const existingRuleKeys = new Set(
+    activeRules.map((rule) =>
+      buildSuggestionKey({
+        matchType:
+          rule.matchType === RuleMatchType.merchant_name
+            ? RuleMatchType.merchant_name
+            : RuleMatchType.transaction_name,
+        matchValue: rule.matchValue,
+        categoryId: rule.categoryId
+      })
+    )
+  );
+
+  const candidates = await prisma.transaction.findMany({
     where: {
       userId,
-      isActive: true,
-      matchType,
-      matchValue,
-      categoryId: transaction.categoryId,
-      accountId: null
+      reviewStatus: {
+        in: [
+          TransactionReviewStatus.auto_categorized,
+          TransactionReviewStatus.user_categorized
+        ]
+      },
+      categoryId: {
+        not: null
+      },
+      aiSuggestedConfidence: {
+        gte: 90
+      }
     },
+    orderBy: [
+      {
+        date: "desc"
+      },
+      {
+        createdAt: "desc"
+      }
+    ],
     select: {
       id: true,
       name: true,
-      priority: true,
-      isActive: true,
-      matchType: true,
-      matchValue: true,
+      merchantName: true,
       categoryId: true,
-      accountId: true
+      category: {
+        select: {
+          key: true,
+          label: true
+        }
+      }
     }
   });
 
-  const rule =
-    existingRule ??
-    (await prisma.transactionRule.create({
-      data: {
-        userId,
-        name: ruleDisplayName(matchType, matchValue, transaction.category.label),
-        matchType,
-        matchValue,
-        categoryId: transaction.categoryId
-      },
-      select: {
-        id: true,
-        name: true,
-        priority: true,
-        isActive: true,
-        matchType: true,
-        matchValue: true,
-        categoryId: true,
-        accountId: true
-      }
-    }));
+  const grouped = new Map<string, TransactionRuleSuggestion>();
 
-  const appliedCount = await applyRuleToMatchingTransactions({
-    ...rule,
-    userId
-  });
+  for (const transaction of candidates) {
+    if (!transaction.categoryId || !transaction.category) {
+      continue;
+    }
+
+    const matchType = transaction.merchantName
+      ? RuleMatchType.merchant_name
+      : RuleMatchType.transaction_name;
+    const matchValue = transaction.merchantName ?? transaction.name;
+    const groupKey = buildSuggestionKey({
+      matchType,
+      matchValue,
+      categoryId: transaction.categoryId
+    });
+
+    const existing = grouped.get(groupKey);
+    if (existing) {
+      existing.occurrenceCount += 1;
+      if (existing.sampleTransactionIds.length < 3) {
+        existing.sampleTransactionIds.push(transaction.id);
+      }
+      continue;
+    }
+
+    grouped.set(groupKey, {
+      id: groupKey,
+      matchType,
+      matchValue,
+      categoryId: transaction.categoryId,
+      categoryKey: transaction.category.key,
+      categoryLabel: transaction.category.label,
+      occurrenceCount: 1,
+      sampleTransactionIds: [transaction.id],
+      sampleDescription: transaction.name,
+      reason: ""
+    });
+  }
+
+  return Array.from(grouped.values())
+    .filter(
+      (suggestion) =>
+        suggestion.occurrenceCount >= 2 &&
+        !existingRuleKeys.has(
+          buildSuggestionKey({
+            matchType: suggestion.matchType,
+            matchValue: suggestion.matchValue,
+            categoryId: suggestion.categoryId
+          })
+        )
+    )
+    .sort((left, right) => right.occurrenceCount - left.occurrenceCount)
+    .map((suggestion) => ({
+      ...suggestion,
+      reason: buildSuggestionReason(
+        suggestion.matchType,
+        suggestion.occurrenceCount
+      )
+    }))
+    .slice(0, 12);
+}
+
+export async function applySuggestedTransactionRules(input?: {
+  suggestionIds?: string[];
+}) {
+  const userId = await getDefaultUserId();
+  const suggestions = await listSuggestedTransactionRules();
+  const selectedSuggestions =
+    input?.suggestionIds && input.suggestionIds.length > 0
+      ? suggestions.filter((suggestion) =>
+          input.suggestionIds?.includes(suggestion.id)
+        )
+      : suggestions;
+
+  const results = [];
+
+  for (const suggestion of selectedSuggestions) {
+    const result = await createOrReuseRule({
+      userId,
+      matchType: suggestion.matchType,
+      matchValue: suggestion.matchValue,
+      categoryId: suggestion.categoryId,
+      categoryLabel: suggestion.categoryLabel
+    });
+
+    results.push({
+      ...suggestion,
+      existed: result.existed,
+      appliedCount: result.appliedCount,
+      ruleId: result.rule.id,
+      ruleName: result.rule.name
+    });
+  }
 
   return {
-    existed: Boolean(existingRule),
-    appliedCount,
-    rule
+    appliedSuggestionCount: results.length,
+    rulesCreatedCount: results.filter((result) => !result.existed).length,
+    transactionsAffectedCount: results.reduce(
+      (sum, result) => sum + result.appliedCount,
+      0
+    ),
+    results
   };
 }

@@ -220,6 +220,29 @@ type AutoCategorizeResponse = {
   model: string;
 };
 
+type SuggestedTransactionRule = {
+  id: string;
+  matchType: "merchant_name" | "transaction_name";
+  matchValue: string;
+  categoryId: string;
+  categoryKey: string;
+  categoryLabel: string;
+  occurrenceCount: number;
+  sampleTransactionIds: string[];
+  sampleDescription: string;
+  reason: string;
+};
+
+type SuggestedTransactionRulesResponse = {
+  suggestions: SuggestedTransactionRule[];
+};
+
+type ApplySuggestedTransactionRulesResponse = {
+  appliedSuggestionCount: number;
+  rulesCreatedCount: number;
+  transactionsAffectedCount: number;
+};
+
 const plaidSetupSteps = [
   "Create a free Plaid developer account and open the Dashboard.",
   "Copy your Sandbox client_id and secret into the app .env file.",
@@ -375,6 +398,9 @@ export function PlaidConnectionPanel() {
     useState<RecurringSummaryResponse | null>(null);
   const [dailyReviewDigest, setDailyReviewDigest] =
     useState<DailyReviewDigest | null>(null);
+  const [suggestedRules, setSuggestedRules] = useState<SuggestedTransactionRule[]>(
+    []
+  );
   const [userEmail, setUserEmail] = useState<string>("owner@example.com");
   const [accountsError, setAccountsError] = useState<string | null>(null);
   const [transactionsError, setTransactionsError] = useState<string | null>(null);
@@ -382,6 +408,9 @@ export function PlaidConnectionPanel() {
   const [cashflowError, setCashflowError] = useState<string | null>(null);
   const [recurringError, setRecurringError] = useState<string | null>(null);
   const [dailyReviewError, setDailyReviewError] = useState<string | null>(null);
+  const [suggestedRulesError, setSuggestedRulesError] = useState<string | null>(
+    null
+  );
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [linkSession, setLinkSession] = useState<StoredPlaidLinkSession | null>(null);
@@ -390,10 +419,12 @@ export function PlaidConnectionPanel() {
   const [isLoadingCashflow, setIsLoadingCashflow] = useState(true);
   const [isLoadingRecurring, setIsLoadingRecurring] = useState(true);
   const [isLoadingDailyReview, setIsLoadingDailyReview] = useState(true);
+  const [isLoadingSuggestedRules, setIsLoadingSuggestedRules] = useState(true);
   const [isCreatingLinkToken, setIsCreatingLinkToken] = useState(false);
   const [isSyncingTransactions, setIsSyncingTransactions] = useState(false);
   const [isAutoCategorizing, setIsAutoCategorizing] = useState(false);
   const [isRunningDailyReview, setIsRunningDailyReview] = useState(false);
+  const [isApplyingSuggestedRules, setIsApplyingSuggestedRules] = useState(false);
   const [disconnectingPlaidItemId, setDisconnectingPlaidItemId] = useState<
     string | null
   >(null);
@@ -570,12 +601,43 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  async function refreshSuggestedRules() {
+    setIsLoadingSuggestedRules(true);
+    setSuggestedRulesError(null);
+
+    try {
+      const response = await fetch("/api/transaction-rules/suggestions", {
+        method: "GET"
+      });
+      const payload = (await response.json()) as SuggestedTransactionRulesResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? "Unable to load suggested transaction rules."
+        );
+      }
+
+      setSuggestedRules(payload.suggestions);
+    } catch (error) {
+      setSuggestedRulesError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load suggested transaction rules."
+      );
+    } finally {
+      setIsLoadingSuggestedRules(false);
+    }
+  }
+
   useEffect(() => {
     void refreshAccounts();
     void refreshCategories();
     void refreshCashflowSummary();
     void refreshRecurringSummary();
     void refreshDailyReviewDigest();
+    void refreshSuggestedRules();
   }, []);
 
   useEffect(() => {
@@ -657,6 +719,7 @@ export function PlaidConnectionPanel() {
     await refreshCashflowSummary();
     await refreshRecurringSummary();
     await refreshDailyReviewDigest();
+    await refreshSuggestedRules();
     clearLinkState();
   }
 
@@ -792,6 +855,7 @@ export function PlaidConnectionPanel() {
       await refreshCashflowSummary();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
+      await refreshSuggestedRules();
       setStatusMessage(`${institutionName} was disconnected and removed.`);
     } catch (error) {
       setStatusMessage(
@@ -841,6 +905,7 @@ export function PlaidConnectionPanel() {
       await refreshCashflowSummary();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
+      await refreshSuggestedRules();
       setStatusMessage("Transaction category updated.");
     } catch (error) {
       setStatusMessage(
@@ -884,6 +949,7 @@ export function PlaidConnectionPanel() {
       await refreshCashflowSummary();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
+      await refreshSuggestedRules();
       setStatusMessage(
         `AI reviewed ${payload.attemptedCount} transaction(s) with ${payload.model}. ` +
           `${payload.categorizedCount} were auto-categorized and ` +
@@ -930,6 +996,7 @@ export function PlaidConnectionPanel() {
       await refreshCashflowSummary();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
+      await refreshSuggestedRules();
       setStatusMessage(
         payload.status === "skipped"
           ? `Daily review skipped because it is not ${formatDailyReviewHour(payload.scheduledHourLocal)} ${payload.timezone} yet.`
@@ -971,6 +1038,7 @@ export function PlaidConnectionPanel() {
       await refreshCashflowSummary();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
+      await refreshSuggestedRules();
       setStatusMessage(
         payload.existed
           ? `Rule already existed. Reapplied to ${payload.appliedCount} matching transactions.`
@@ -982,6 +1050,47 @@ export function PlaidConnectionPanel() {
       );
     } finally {
       setCreatingRuleTransactionId(null);
+    }
+  }
+
+  async function handleApplySuggestedRules() {
+    setIsApplyingSuggestedRules(true);
+    setStatusMessage("Creating reusable rules from repeated AI-reviewed patterns...");
+
+    try {
+      const response = await fetch("/api/transaction-rules/suggestions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({})
+      });
+      const payload = (await response.json()) as ApplySuggestedTransactionRulesResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? "Unable to create suggested transaction rules."
+        );
+      }
+
+      await refreshTransactions();
+      await refreshCashflowSummary();
+      await refreshRecurringSummary();
+      await refreshDailyReviewDigest();
+      await refreshSuggestedRules();
+      setStatusMessage(
+        `Created ${payload.rulesCreatedCount} rule(s) from ${payload.appliedSuggestionCount} repeated pattern(s) and updated ${payload.transactionsAffectedCount} transactions.`
+      );
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to create suggested transaction rules."
+      );
+    } finally {
+      setIsApplyingSuggestedRules(false);
     }
   }
 
@@ -1128,6 +1237,58 @@ export function PlaidConnectionPanel() {
               type="button"
             >
               {isRunningDailyReview ? "Running..." : "Run and ping now"}
+            </button>
+          </div>
+        </article>
+
+        <article className="card">
+          <h3>Suggested AI rules</h3>
+          {isLoadingSuggestedRules ? (
+            <p className="panelCopy">Looking for repeated reviewed patterns...</p>
+          ) : suggestedRulesError ? (
+            <p className="errorLine">{suggestedRulesError}</p>
+          ) : suggestedRules.length === 0 ? (
+            <p className="panelCopy">
+              No repeated high-confidence patterns yet. After a few more reviewed
+              transactions, this card will suggest reusable rules.
+            </p>
+          ) : (
+            <>
+              <p className="panelCopy">
+                Repeated, high-confidence AI categorizations can be turned into
+                permanent rules so tomorrow&apos;s syncs need less review.
+              </p>
+              <ul className="list tightList">
+                {suggestedRules.slice(0, 4).map((suggestion) => (
+                  <li key={suggestion.id}>
+                    <strong>{suggestion.matchValue}</strong> → {suggestion.categoryLabel}
+                    {" · "}
+                    {suggestion.occurrenceCount} matches
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <div className="buttonRow">
+            <button
+              className="secondaryButton"
+              disabled={
+                isApplyingSuggestedRules ||
+                isLoadingSuggestedRules ||
+                suggestedRules.length === 0
+              }
+              onClick={() => void handleApplySuggestedRules()}
+              type="button"
+            >
+              {isApplyingSuggestedRules ? "Creating..." : "Create suggested rules"}
+            </button>
+            <button
+              className="secondaryButton"
+              disabled={isApplyingSuggestedRules}
+              onClick={() => void refreshSuggestedRules()}
+              type="button"
+            >
+              Refresh suggestions
             </button>
           </div>
         </article>
