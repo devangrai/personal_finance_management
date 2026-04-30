@@ -244,6 +244,39 @@ type ApplySuggestedTransactionRulesResponse = {
   transactionsAffectedCount: number;
 };
 
+type UserProfileSnapshot = {
+  birthYear: number | null;
+  dependents: number;
+  housingStatus: "rent_free" | "rent" | "mortgage" | "other";
+  annualIncome: string | null;
+  biweeklyNetPay: string | null;
+  monthlyFixedExpense: string | null;
+  emergencyFundTarget: string | null;
+  targetRetirementSavingsRate: string | null;
+  notes: string | null;
+};
+
+type UserProfileResponse = {
+  profile: UserProfileSnapshot;
+};
+
+type RetirementRecommendationResponse = {
+  recommendation: {
+    recommendedBiweeklyContribution: string;
+    reasoning: string[];
+    assumptions: string[];
+    targetSavingsRatePercent: string | null;
+  } | null;
+  inputs: {
+    biweeklyNetPay: string | null;
+    monthlyFixedExpense: string;
+    averageVariableMonthlyExpense: string;
+    emergencyFundTarget: string;
+    housingStatus: string;
+  };
+  missingFields: string[];
+};
+
 const plaidSetupSteps = [
   "Create a free Plaid developer account and open the Dashboard.",
   "Copy your Sandbox client_id and secret into the app .env file.",
@@ -353,6 +386,19 @@ function formatDailyReviewHour(hour: number) {
   }).format(date);
 }
 
+function formatHousingStatus(value: UserProfileSnapshot["housingStatus"]) {
+  switch (value) {
+    case "rent_free":
+      return "Rent free";
+    case "mortgage":
+      return "Mortgage";
+    case "rent":
+      return "Rent";
+    default:
+      return "Other";
+  }
+}
+
 function PlaidLinkLauncher({
   linkToken,
   linkSession,
@@ -402,6 +448,17 @@ export function PlaidConnectionPanel() {
   const [suggestedRules, setSuggestedRules] = useState<SuggestedTransactionRule[]>(
     []
   );
+  const [profile, setProfile] = useState<UserProfileSnapshot | null>(null);
+  const [retirementRecommendation, setRetirementRecommendation] =
+    useState<RetirementRecommendationResponse | null>(null);
+  const [profileForm, setProfileForm] = useState({
+    housingStatus: "rent_free" as UserProfileSnapshot["housingStatus"],
+    biweeklyNetPay: "",
+    monthlyFixedExpense: "",
+    emergencyFundTarget: "",
+    targetRetirementSavingsRate: "",
+    notes: ""
+  });
   const [userEmail, setUserEmail] = useState<string>("owner@example.com");
   const [accountsError, setAccountsError] = useState<string | null>(null);
   const [transactionsError, setTransactionsError] = useState<string | null>(null);
@@ -412,6 +469,9 @@ export function PlaidConnectionPanel() {
   const [suggestedRulesError, setSuggestedRulesError] = useState<string | null>(
     null
   );
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [retirementRecommendationError, setRetirementRecommendationError] =
+    useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [linkSession, setLinkSession] = useState<StoredPlaidLinkSession | null>(null);
@@ -421,11 +481,15 @@ export function PlaidConnectionPanel() {
   const [isLoadingRecurring, setIsLoadingRecurring] = useState(true);
   const [isLoadingDailyReview, setIsLoadingDailyReview] = useState(true);
   const [isLoadingSuggestedRules, setIsLoadingSuggestedRules] = useState(true);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isLoadingRetirementRecommendation, setIsLoadingRetirementRecommendation] =
+    useState(true);
   const [isCreatingLinkToken, setIsCreatingLinkToken] = useState(false);
   const [isSyncingTransactions, setIsSyncingTransactions] = useState(false);
   const [isAutoCategorizing, setIsAutoCategorizing] = useState(false);
   const [isRunningDailyReview, setIsRunningDailyReview] = useState(false);
   const [isApplyingSuggestedRules, setIsApplyingSuggestedRules] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [disconnectingPlaidItemId, setDisconnectingPlaidItemId] = useState<
     string | null
   >(null);
@@ -632,6 +696,71 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  async function refreshProfile() {
+    setIsLoadingProfile(true);
+    setProfileError(null);
+
+    try {
+      const response = await fetch("/api/profile", {
+        method: "GET"
+      });
+      const payload = (await response.json()) as UserProfileResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to load the user profile.");
+      }
+
+      setProfile(payload.profile);
+      setProfileForm({
+        housingStatus: payload.profile.housingStatus,
+        biweeklyNetPay: payload.profile.biweeklyNetPay ?? "",
+        monthlyFixedExpense: payload.profile.monthlyFixedExpense ?? "",
+        emergencyFundTarget: payload.profile.emergencyFundTarget ?? "",
+        targetRetirementSavingsRate:
+          payload.profile.targetRetirementSavingsRate ?? "",
+        notes: payload.profile.notes ?? ""
+      });
+    } catch (error) {
+      setProfileError(
+        error instanceof Error ? error.message : "Unable to load the user profile."
+      );
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  }
+
+  async function refreshRetirementRecommendation() {
+    setIsLoadingRetirementRecommendation(true);
+    setRetirementRecommendationError(null);
+
+    try {
+      const response = await fetch("/api/advisor/retirement", {
+        method: "GET"
+      });
+      const payload = (await response.json()) as RetirementRecommendationResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? "Unable to load the retirement recommendation."
+        );
+      }
+
+      setRetirementRecommendation(payload);
+    } catch (error) {
+      setRetirementRecommendationError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load the retirement recommendation."
+      );
+    } finally {
+      setIsLoadingRetirementRecommendation(false);
+    }
+  }
+
   useEffect(() => {
     void refreshAccounts();
     void refreshCategories();
@@ -639,6 +768,8 @@ export function PlaidConnectionPanel() {
     void refreshRecurringSummary();
     void refreshDailyReviewDigest();
     void refreshSuggestedRules();
+    void refreshProfile();
+    void refreshRetirementRecommendation();
   }, []);
 
   useEffect(() => {
@@ -718,6 +849,7 @@ export function PlaidConnectionPanel() {
     await refreshAccounts();
     await refreshTransactions();
     await refreshCashflowSummary();
+    await refreshRetirementRecommendation();
     await refreshRecurringSummary();
     await refreshDailyReviewDigest();
     await refreshSuggestedRules();
@@ -812,6 +944,7 @@ export function PlaidConnectionPanel() {
 
       await Promise.all([refreshAccounts(), refreshTransactions()]);
       await refreshCashflowSummary();
+      await refreshRetirementRecommendation();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       const failureSuffix =
@@ -854,6 +987,7 @@ export function PlaidConnectionPanel() {
       await refreshAccounts();
       await refreshTransactions();
       await refreshCashflowSummary();
+      await refreshRetirementRecommendation();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       await refreshSuggestedRules();
@@ -904,6 +1038,7 @@ export function PlaidConnectionPanel() {
         )
       );
       await refreshCashflowSummary();
+      await refreshRetirementRecommendation();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       await refreshSuggestedRules();
@@ -948,6 +1083,7 @@ export function PlaidConnectionPanel() {
 
       await refreshTransactions();
       await refreshCashflowSummary();
+      await refreshRetirementRecommendation();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       await refreshSuggestedRules();
@@ -995,6 +1131,7 @@ export function PlaidConnectionPanel() {
 
       await refreshTransactions();
       await refreshCashflowSummary();
+      await refreshRetirementRecommendation();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       await refreshSuggestedRules();
@@ -1037,6 +1174,7 @@ export function PlaidConnectionPanel() {
 
       await refreshTransactions();
       await refreshCashflowSummary();
+      await refreshRetirementRecommendation();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       await refreshSuggestedRules();
@@ -1078,6 +1216,7 @@ export function PlaidConnectionPanel() {
 
       await refreshTransactions();
       await refreshCashflowSummary();
+      await refreshRetirementRecommendation();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       await refreshSuggestedRules();
@@ -1092,6 +1231,40 @@ export function PlaidConnectionPanel() {
       );
     } finally {
       setIsApplyingSuggestedRules(false);
+    }
+  }
+
+  async function handleSaveProfile() {
+    setIsSavingProfile(true);
+    setStatusMessage("Saving advisor profile...");
+
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(profileForm)
+      });
+      const payload = (await response.json()) as UserProfileResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to save the advisor profile.");
+      }
+
+      setProfile(payload.profile);
+      await refreshRetirementRecommendation();
+      setStatusMessage("Advisor profile saved.");
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to save the advisor profile."
+      );
+    } finally {
+      setIsSavingProfile(false);
     }
   }
 
@@ -1424,6 +1597,201 @@ export function PlaidConnectionPanel() {
             </div>
           </>
         )}
+      </div>
+
+      <div className="advisorBlock">
+        <div className="accountsHeader">
+          <div>
+            <h3>Advisor groundwork</h3>
+            <p className="panelCopy">
+              Save a few personal context inputs and the app can turn reviewed
+              cash flow into an explainable retirement contribution suggestion.
+            </p>
+          </div>
+          <button
+            className="secondaryButton"
+            disabled={isLoadingRetirementRecommendation}
+            onClick={() => void refreshRetirementRecommendation()}
+            type="button"
+          >
+            Refresh recommendation
+          </button>
+        </div>
+
+        <div className="grid gridWide">
+          <article className="card">
+            <h3>Profile inputs</h3>
+            {isLoadingProfile ? (
+              <p className="panelCopy">Loading your advisor profile...</p>
+            ) : profileError ? (
+              <p className="errorLine">{profileError}</p>
+            ) : (
+              <>
+                <div className="profileGrid">
+                  <label className="profileField">
+                    <span>Housing status</span>
+                    <select
+                      className="categorySelect"
+                      onChange={(event) =>
+                        setProfileForm((current) => ({
+                          ...current,
+                          housingStatus: event.target
+                            .value as UserProfileSnapshot["housingStatus"]
+                        }))
+                      }
+                      value={profileForm.housingStatus}
+                    >
+                      <option value="rent_free">Rent free</option>
+                      <option value="rent">Rent</option>
+                      <option value="mortgage">Mortgage</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+
+                  <label className="profileField">
+                    <span>Biweekly net pay</span>
+                    <input
+                      className="categorySelect"
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setProfileForm((current) => ({
+                          ...current,
+                          biweeklyNetPay: event.target.value
+                        }))
+                      }
+                      placeholder="0.00"
+                      value={profileForm.biweeklyNetPay}
+                    />
+                  </label>
+
+                  <label className="profileField">
+                    <span>Fixed monthly expenses</span>
+                    <input
+                      className="categorySelect"
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setProfileForm((current) => ({
+                          ...current,
+                          monthlyFixedExpense: event.target.value
+                        }))
+                      }
+                      placeholder="0.00"
+                      value={profileForm.monthlyFixedExpense}
+                    />
+                  </label>
+
+                  <label className="profileField">
+                    <span>Emergency fund target</span>
+                    <input
+                      className="categorySelect"
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setProfileForm((current) => ({
+                          ...current,
+                          emergencyFundTarget: event.target.value
+                        }))
+                      }
+                      placeholder="0.00"
+                      value={profileForm.emergencyFundTarget}
+                    />
+                  </label>
+
+                  <label className="profileField">
+                    <span>Target retirement savings rate (%)</span>
+                    <input
+                      className="categorySelect"
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setProfileForm((current) => ({
+                          ...current,
+                          targetRetirementSavingsRate: event.target.value
+                        }))
+                      }
+                      placeholder="15.00"
+                      value={profileForm.targetRetirementSavingsRate}
+                    />
+                  </label>
+                </div>
+
+                <p className="metaLine">
+                  Current profile: {profile ? formatHousingStatus(profile.housingStatus) : "Unknown"}
+                </p>
+
+                <div className="buttonRow">
+                  <button
+                    className="secondaryButton"
+                    disabled={isSavingProfile}
+                    onClick={() => void handleSaveProfile()}
+                    type="button"
+                  >
+                    {isSavingProfile ? "Saving..." : "Save profile"}
+                  </button>
+                </div>
+              </>
+            )}
+          </article>
+
+          <article className="card">
+            <h3>Retirement recommendation</h3>
+            {isLoadingRetirementRecommendation ? (
+              <p className="panelCopy">Calculating your contribution suggestion...</p>
+            ) : retirementRecommendationError ? (
+              <p className="errorLine">{retirementRecommendationError}</p>
+            ) : !retirementRecommendation ? (
+              <p className="panelCopy">
+                Recommendation unavailable until the advisor inputs load.
+              </p>
+            ) : retirementRecommendation.recommendation ? (
+              <>
+                <p className="summaryValue">
+                  {formatCurrency(
+                    retirementRecommendation.recommendation
+                      .recommendedBiweeklyContribution
+                  )}
+                </p>
+                <p className="summaryMeta">
+                  Recommended per paycheck based on reviewed spending and your
+                  saved profile.
+                </p>
+                <ul className="list tightList">
+                  {retirementRecommendation.recommendation.reasoning.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+                <p className="metaLine">
+                  Variable spend basis:{" "}
+                  {formatCurrency(
+                    retirementRecommendation.inputs.averageVariableMonthlyExpense
+                  )}{" "}
+                  per month
+                </p>
+                {retirementRecommendation.recommendation.targetSavingsRatePercent ? (
+                  <p className="metaLine">
+                    Target savings rate:{" "}
+                    {retirementRecommendation.recommendation.targetSavingsRatePercent}%
+                  </p>
+                ) : null}
+                <ul className="list tightList">
+                  {retirementRecommendation.recommendation.assumptions.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <>
+                <p className="panelCopy">
+                  Add the missing inputs below before the app can recommend a
+                  paycheck contribution.
+                </p>
+                <ul className="list tightList">
+                  {retirementRecommendation.missingFields.map((field) => (
+                    <li key={field}>{field}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </article>
+        </div>
       </div>
 
       <div className="recurringBlock">
