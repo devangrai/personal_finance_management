@@ -2859,7 +2859,7 @@ export function PlaidConnectionPanel() {
         </article>
 
         <article className="panel advisorScenarioPanel">
-          <h3>Observed paycheck-to-account flow</h3>
+          <h3>Observed paycheck and account flow</h3>
           {isLoadingAdvisorPlan ? (
             <p className="panelCopy">Mapping paycheck flows into Fidelity accounts...</p>
           ) : advisorPlanError ? (
@@ -2869,8 +2869,10 @@ export function PlaidConnectionPanel() {
           ) : (
             <>
               <p className="panelCopy">
-                This view uses imported Fidelity transactions plus paycheck detections
-                from your banking ledger to show where money is landing each cycle.
+                This view combines detected paycheck deposits with recurring Fidelity
+                contribution patterns so we can see how cash and retirement flows are
+                showing up across accounts. Rows without take-home are contribution
+                cycles that have not been cleanly matched to a bank paycheck yet.
               </p>
               <div className="summaryGrid">
                 <article className="summaryCard">
@@ -2911,7 +2913,7 @@ export function PlaidConnectionPanel() {
                   </p>
                 </article>
                 <article className="summaryCard">
-                  <p className="summaryLabel">Individual brokerage</p>
+                  <p className="summaryLabel">Recurring brokerage deposit</p>
                   <p className="summaryValue">
                     {formatCurrency(
                       advisorPlan.paycheckFlow.currentBiweeklyTaxableBrokerageDeposit

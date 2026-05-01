@@ -18,6 +18,19 @@ type FlowEvent = {
   amountCents: number;
 };
 
+type FlowPeriodSummary = {
+  anchorDate: string;
+  takeHomePayCents: number | null;
+  totalRetirementContributionCents: number;
+  traditional401kContributionCents: number;
+  roth401kContributionCents: number;
+  taxableBrokerageDepositCents: number;
+  rothIraContributionCents: number;
+  hsaEmployeeContributionCents: number;
+  hsaEmployerContributionCents: number;
+  matchedBy: "paycheck" | "investment_flow";
+};
+
 export type ObservedPaycheckFlowSnapshot = {
   takeHomeBaselineBiweekly: string | null;
   takeHomeSource: "transactions" | "profile" | "unknown";
@@ -76,6 +89,11 @@ type ObservedPaycheckFlowComputation = {
   notes: string[];
 };
 
+const MIN_SIGNIFICANT_PAYCHECK_CENTS = 10_000;
+const RETIREMENT_CLUSTER_GAP_DAYS = 2;
+const HSA_CLUSTER_GAP_DAYS = 1;
+const RECENT_PERIOD_MERGE_GAP_DAYS = 3;
+
 function centsToDollarsString(value: number) {
   return (value / 100).toFixed(2);
 }
@@ -98,6 +116,10 @@ function average(values: number[]) {
 
 function daysBetween(left: Date, right: Date) {
   return Math.abs(left.getTime() - right.getTime()) / (1000 * 60 * 60 * 24);
+}
+
+function parseAnchorDate(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
 }
 
 function toLowerText(value: string | null | undefined) {
@@ -268,7 +290,7 @@ function normalizePlaidInvestmentFlowEvent(input: {
   return null;
 }
 
-function clusterFlowEvents(events: FlowEvent[]) {
+function clusterFlowEvents(events: FlowEvent[], maxGapDays: number) {
   const sortedEvents = [...events].sort(
     (left, right) => left.date.getTime() - right.date.getTime()
   );
@@ -278,7 +300,7 @@ function clusterFlowEvents(events: FlowEvent[]) {
     const currentCluster = clusters[clusters.length - 1];
     const lastEvent = currentCluster?.[currentCluster.length - 1];
 
-    if (lastEvent && daysBetween(lastEvent.date, event.date) <= 5) {
+    if (lastEvent && daysBetween(lastEvent.date, event.date) <= maxGapDays) {
       currentCluster.push(event);
       continue;
     }
@@ -289,7 +311,7 @@ function clusterFlowEvents(events: FlowEvent[]) {
   return clusters;
 }
 
-function summarizeFlowCluster(events: FlowEvent[]) {
+function summarizeFlowCluster(events: FlowEvent[]): FlowPeriodSummary {
   const takeHomePayCents = events
     .filter((event) => event.kind === "take_home_paycheck")
     .reduce((sum, event) => sum + event.amountCents, 0);
@@ -336,6 +358,58 @@ function summarizeFlowCluster(events: FlowEvent[]) {
     matchedBy:
       takeHomePayCents > 0 ? ("paycheck" as const) : ("investment_flow" as const)
   };
+}
+
+function mergeFlowPeriodSummaries(
+  periods: FlowPeriodSummary[],
+  maxGapDays: number
+) {
+  const sortedPeriods = [...periods].sort(
+    (left, right) =>
+      parseAnchorDate(left.anchorDate).getTime() -
+      parseAnchorDate(right.anchorDate).getTime()
+  );
+  const mergedPeriods: FlowPeriodSummary[] = [];
+
+  for (const period of sortedPeriods) {
+    const currentPeriod = mergedPeriods[mergedPeriods.length - 1];
+
+    if (
+      currentPeriod &&
+      daysBetween(
+        parseAnchorDate(currentPeriod.anchorDate),
+        parseAnchorDate(period.anchorDate)
+      ) <= maxGapDays
+    ) {
+      const combinedTakeHome =
+        (currentPeriod.takeHomePayCents ?? 0) + (period.takeHomePayCents ?? 0);
+
+      currentPeriod.anchorDate =
+        parseAnchorDate(period.anchorDate) > parseAnchorDate(currentPeriod.anchorDate)
+          ? period.anchorDate
+          : currentPeriod.anchorDate;
+      currentPeriod.takeHomePayCents = combinedTakeHome > 0 ? combinedTakeHome : null;
+      currentPeriod.totalRetirementContributionCents +=
+        period.totalRetirementContributionCents;
+      currentPeriod.traditional401kContributionCents +=
+        period.traditional401kContributionCents;
+      currentPeriod.roth401kContributionCents += period.roth401kContributionCents;
+      currentPeriod.taxableBrokerageDepositCents +=
+        period.taxableBrokerageDepositCents;
+      currentPeriod.rothIraContributionCents += period.rothIraContributionCents;
+      currentPeriod.hsaEmployeeContributionCents +=
+        period.hsaEmployeeContributionCents;
+      currentPeriod.hsaEmployerContributionCents +=
+        period.hsaEmployerContributionCents;
+      currentPeriod.matchedBy =
+        currentPeriod.takeHomePayCents != null ? "paycheck" : "investment_flow";
+      continue;
+    }
+
+    mergedPeriods.push({ ...period });
+  }
+
+  return mergedPeriods;
 }
 
 function buildObservedPaycheckFlowSnapshot(
@@ -507,6 +581,9 @@ export async function getObservedPaycheckFlowComputation(): Promise<ObservedPayc
     date: transaction.date,
     amountCents: decimalStringToCents(transaction.amount.toString())
   }));
+  const significantPaycheckEvents = paycheckEvents.filter(
+    (event) => event.amountCents >= MIN_SIGNIFICANT_PAYCHECK_CENTS
+  );
 
   const manualFlowEvents = manualInvestmentTransactions
     .map((transaction) =>
@@ -535,27 +612,60 @@ export async function getObservedPaycheckFlowComputation(): Promise<ObservedPayc
     )
     .filter((event): event is FlowEvent => event !== null);
 
-  const relevantClusters = clusterFlowEvents([
-    ...paycheckEvents,
-    ...manualFlowEvents,
-    ...plaidFlowEvents
-  ])
+  const retirementFlowEvents = [...manualFlowEvents, ...plaidFlowEvents].filter((event) =>
+    [
+      "retirement_plan_total",
+      "traditional_401k_allocation",
+      "roth_401k_allocation",
+      "roth_ira_contribution"
+    ].includes(event.kind)
+  );
+  const taxableBrokerageDepositEvents = [...manualFlowEvents, ...plaidFlowEvents].filter(
+    (event) => event.kind === "taxable_brokerage_deposit"
+  );
+  const hsaFlowEvents = [...manualFlowEvents, ...plaidFlowEvents].filter((event) =>
+    ["hsa_employee_contribution", "hsa_employer_contribution"].includes(event.kind)
+  );
+
+  const retirementCycles = clusterFlowEvents(
+    retirementFlowEvents,
+    RETIREMENT_CLUSTER_GAP_DAYS
+  )
+    .map(summarizeFlowCluster)
+    .filter((period) => period.totalRetirementContributionCents > 0)
+    .sort(
+      (left, right) =>
+        parseAnchorDate(right.anchorDate).getTime() -
+        parseAnchorDate(left.anchorDate).getTime()
+    );
+  const paycheckPeriods = significantPaycheckEvents.map((event) =>
+    summarizeFlowCluster([event])
+  );
+  const taxableBrokeragePeriods = taxableBrokerageDepositEvents.map((event) =>
+    summarizeFlowCluster([event])
+  );
+  const hsaPeriods = clusterFlowEvents(hsaFlowEvents, HSA_CLUSTER_GAP_DAYS)
     .map(summarizeFlowCluster)
     .filter(
       (period) =>
-        period.totalRetirementContributionCents > 0 ||
-        period.taxableBrokerageDepositCents > 0 ||
         period.hsaEmployeeContributionCents > 0 ||
         period.hsaEmployerContributionCents > 0
-    )
-    .sort(
-      (left, right) =>
-        new Date(right.anchorDate).getTime() - new Date(left.anchorDate).getTime()
     );
 
-  const averagingWindow = relevantClusters.slice(0, 4);
+  const recentPayPeriods = mergeFlowPeriodSummaries(
+    [...paycheckPeriods, ...retirementCycles, ...taxableBrokeragePeriods, ...hsaPeriods],
+    RECENT_PERIOD_MERGE_GAP_DAYS
+  )
+    .sort(
+      (left, right) =>
+        parseAnchorDate(right.anchorDate).getTime() -
+        parseAnchorDate(left.anchorDate).getTime()
+    )
+    .slice(0, 6);
+
+  const retirementAveragingWindow = retirementCycles.slice(0, 4);
   const takeHomeBaselineBiweeklyFromTransactions = average(
-    paycheckEvents
+    significantPaycheckEvents
       .map((event) => event.amountCents)
       .filter((value) => value > 0)
   );
@@ -574,31 +684,55 @@ export async function getObservedPaycheckFlowComputation(): Promise<ObservedPayc
         : ("unknown" as const);
 
   const currentBiweeklyRetirementContributionCents = average(
-    averagingWindow.map((period) => period.totalRetirementContributionCents)
+    retirementAveragingWindow.map((period) => period.totalRetirementContributionCents)
   );
   const currentBiweeklyTraditional401kContributionCents = average(
-    averagingWindow.map((period) => period.traditional401kContributionCents)
+    retirementAveragingWindow.map((period) => period.traditional401kContributionCents)
   );
   const currentBiweeklyRoth401kContributionCents = average(
-    averagingWindow.map((period) => period.roth401kContributionCents)
+    retirementAveragingWindow.map((period) => period.roth401kContributionCents)
   );
   const currentBiweeklyTaxableBrokerageDepositCents = average(
-    averagingWindow.map((period) => period.taxableBrokerageDepositCents)
+    taxableBrokerageDepositEvents.map((event) => event.amountCents)
   );
   const currentBiweeklyRothIraContributionCents = average(
-    averagingWindow.map((period) => period.rothIraContributionCents)
+    retirementAveragingWindow.map((period) => period.rothIraContributionCents)
   );
   const currentBiweeklyHsaEmployeeContributionCents = average(
-    averagingWindow.map((period) => period.hsaEmployeeContributionCents)
+    hsaPeriods.map((period) => period.hsaEmployeeContributionCents)
   );
   const currentBiweeklyHsaEmployerContributionCents = average(
-    averagingWindow.map((period) => period.hsaEmployerContributionCents)
+    hsaPeriods.map((period) => period.hsaEmployerContributionCents)
   );
 
   const notes = [
     "Take-home percentages use paycheck deposits when they are available, otherwise the saved biweekly net-pay profile.",
     "401(k) and BrokerageLink percentages are shown relative to take-home pay, so they are a practical cash-flow lens rather than a formal gross-pay deferral rate."
   ];
+
+  if (paycheckEvents.length !== significantPaycheckEvents.length) {
+    notes.push(
+      "Tiny payroll verification credits are ignored when estimating take-home pay so they do not distort the paycheck baseline."
+    );
+  }
+
+  if (significantPaycheckEvents.length < 3) {
+    notes.push(
+      "The take-home baseline currently comes from a small number of detected paycheck deposits, so treat it as directional until more payroll history is available."
+    );
+  }
+
+  if (currentBiweeklyTaxableBrokerageDepositCents > 0) {
+    notes.push(
+      "Recurring taxable brokerage deposits are inferred from Fidelity cash transfers and may be funded from cash already sitting in your bank or cash-management accounts."
+    );
+  }
+
+  if (retirementCycles.length > 0) {
+    notes.push(
+      "Retirement contribution averages are deduplicated from Fidelity plan contributions and BrokerageLink transfer records so the same pay cycle is not counted twice."
+    );
+  }
 
   return {
     takeHomeBaselineBiweeklyCents,
@@ -626,7 +760,7 @@ export async function getObservedPaycheckFlowComputation(): Promise<ObservedPayc
       currentBiweeklyTaxableBrokerageDepositCents,
       takeHomeBaselineBiweeklyCents
     ),
-    recentPayPeriods: relevantClusters.slice(0, 6),
+    recentPayPeriods,
     notes
   };
 }
