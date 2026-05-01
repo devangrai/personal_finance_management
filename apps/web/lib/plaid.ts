@@ -1,6 +1,8 @@
 import {
   CountryCode,
   type AccountsGetResponse,
+  type Holding,
+  type InvestmentTransaction as PlaidInvestmentTransaction,
   type LinkTokenCreateResponse,
   type RemovedTransaction,
   type Transaction as PlaidTransaction,
@@ -56,6 +58,12 @@ type ExistingPersistedTransaction = {
   reviewStatus: TransactionReviewStatus;
 };
 
+type InvestmentSecurityRecord = {
+  security_id: string;
+  ticker_symbol: string | null;
+  name: string | null;
+};
+
 function resolvePlaidItemEnvironment(value: string) {
   switch (value) {
     case "sandbox":
@@ -90,6 +98,17 @@ function normalizeBalance(value: number | null | undefined) {
   }
 
   return value.toFixed(2);
+}
+
+function normalizePreciseNumber(
+  value: number | null | undefined,
+  precision: number
+) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return value.toFixed(precision);
 }
 
 export function getPlaidApi() {
@@ -319,7 +338,10 @@ export async function listPersistedPlaidItems() {
         select: {
           id: true,
           plaidAccountId: true,
-          name: true
+          name: true,
+          type: true,
+          subtype: true,
+          mask: true
         }
       }
     },
@@ -348,7 +370,10 @@ async function findPersistedPlaidItemById(id: string) {
         select: {
           id: true,
           plaidAccountId: true,
-          name: true
+          name: true,
+          type: true,
+          subtype: true,
+          mask: true
         }
       }
     }
@@ -374,7 +399,10 @@ async function findPersistedPlaidItemByPlaidItemId(plaidItemId: string) {
         select: {
           id: true,
           plaidAccountId: true,
-          name: true
+          name: true,
+          type: true,
+          subtype: true,
+          mask: true
         }
       }
     }
@@ -777,6 +805,335 @@ export async function syncTransactionsForPlaidItem(plaidItemId: string) {
   return syncTransactionsForPersistedItem(plaidItem);
 }
 
+type InvestmentSyncResult = {
+  plaidItemId: string;
+  institutionName: string | null;
+  holdingsCount: number;
+  investmentTransactionCount: number;
+  accountCount: number;
+  asOf: string;
+};
+
+function getInvestmentAccountIds(plaidItem: PlaidItemWithAccounts) {
+  return plaidItem.accounts
+    .filter((account) => account.type === AccountType.investment)
+    .map((account) => account.plaidAccountId);
+}
+
+function buildSecurityMap(
+  securities: InvestmentSecurityRecord[]
+) {
+  return new Map(
+    securities.map((security) => [
+      security.security_id,
+      {
+        symbol: security.ticker_symbol ?? null,
+        name: security.name
+      }
+    ])
+  );
+}
+
+async function upsertInvestmentAccountBalances(
+  plaidItem: PlaidItemWithAccounts,
+  accounts: Array<{
+    account_id: string;
+    balances: {
+      available?: number | null;
+      current?: number | null;
+    };
+  }>
+) {
+  await Promise.all(
+    accounts.map((account) =>
+      prisma.account.updateMany({
+        where: {
+          plaidItemId: plaidItem.id,
+          plaidAccountId: account.account_id
+        },
+        data: {
+          currentBalance: normalizeBalance(account.balances.current),
+          availableBalance: normalizeBalance(account.balances.available),
+          isActive: true
+        }
+      })
+    )
+  );
+}
+
+async function createHoldingSnapshotsForItem(
+  plaidItem: PlaidItemWithAccounts,
+  holdings: Holding[],
+  securities: InvestmentSecurityRecord[],
+  asOf: Date
+) {
+  if (holdings.length === 0) {
+    return 0;
+  }
+
+  const securityMap = buildSecurityMap(securities);
+  const accountIdByPlaidAccountId = new Map<string, string>(
+    plaidItem.accounts.map((account: PersistedPlaidAccount) => [
+      account.plaidAccountId,
+      account.id
+    ])
+  );
+
+  await prisma.holdingSnapshot.createMany({
+    data: holdings
+      .map((holding) => {
+        const accountId = accountIdByPlaidAccountId.get(holding.account_id);
+        if (!accountId) {
+          return null;
+        }
+
+        const security = holding.security_id
+          ? securityMap.get(holding.security_id)
+          : null;
+
+        return {
+          userId: plaidItem.userId,
+          accountId,
+          asOf,
+          securityId: holding.security_id ?? null,
+          symbol: security?.symbol ?? null,
+          securityName: security?.name ?? holding.security_id ?? "Unknown security",
+          quantity: normalizePreciseNumber(holding.quantity, 8),
+          institutionPrice: normalizePreciseNumber(holding.institution_price, 4),
+          institutionValue: normalizeBalance(holding.institution_value),
+          costBasis: normalizeBalance(holding.cost_basis),
+          isoCurrencyCode:
+            holding.iso_currency_code ?? holding.unofficial_currency_code ?? "USD"
+        };
+      })
+      .filter((holding): holding is NonNullable<typeof holding> => holding !== null)
+  });
+
+  return holdings.length;
+}
+
+async function upsertInvestmentTransactionsForItem(
+  plaidItem: PlaidItemWithAccounts,
+  transactions: PlaidInvestmentTransaction[],
+  securities: InvestmentSecurityRecord[]
+) {
+  if (transactions.length === 0) {
+    return 0;
+  }
+
+  const securityMap = buildSecurityMap(securities);
+  const accountIdByPlaidAccountId = new Map<string, string>(
+    plaidItem.accounts.map((account: PersistedPlaidAccount) => [
+      account.plaidAccountId,
+      account.id
+    ])
+  );
+
+  await Promise.all(
+    transactions.map((transaction) => {
+      const accountId = accountIdByPlaidAccountId.get(transaction.account_id);
+      if (!accountId) {
+        throw new Error(
+          `Missing persisted account for investment account ${transaction.account_id}.`
+        );
+      }
+
+      const date = parseTransactionDate(transaction.date);
+      if (!date) {
+        throw new Error(
+          `Investment transaction ${transaction.investment_transaction_id} is missing a date.`
+        );
+      }
+
+      const security = transaction.security_id
+        ? securityMap.get(transaction.security_id)
+        : null;
+
+      return prisma.investmentTransaction.upsert({
+        where: {
+          plaidInvestmentTransactionId: transaction.investment_transaction_id
+        },
+        update: {
+          userId: plaidItem.userId,
+          accountId,
+          securityId: transaction.security_id ?? null,
+          symbol: security?.symbol ?? null,
+          name: security?.name ?? transaction.name,
+          type: transaction.type,
+          subtype: transaction.subtype ?? null,
+          amount: normalizeBalance(transaction.amount) ?? "0.00",
+          quantity: normalizePreciseNumber(transaction.quantity, 8),
+          price: normalizePreciseNumber(transaction.price, 4),
+          fees: normalizeBalance(transaction.fees),
+          date,
+          isoCurrencyCode:
+            transaction.iso_currency_code ??
+            transaction.unofficial_currency_code ??
+            "USD"
+        },
+        create: {
+          userId: plaidItem.userId,
+          accountId,
+          plaidInvestmentTransactionId: transaction.investment_transaction_id,
+          securityId: transaction.security_id ?? null,
+          symbol: security?.symbol ?? null,
+          name: security?.name ?? transaction.name,
+          type: transaction.type,
+          subtype: transaction.subtype ?? null,
+          amount: normalizeBalance(transaction.amount) ?? "0.00",
+          quantity: normalizePreciseNumber(transaction.quantity, 8),
+          price: normalizePreciseNumber(transaction.price, 4),
+          fees: normalizeBalance(transaction.fees),
+          date,
+          isoCurrencyCode:
+            transaction.iso_currency_code ??
+            transaction.unofficial_currency_code ??
+            "USD"
+        }
+      });
+    })
+  );
+
+  return transactions.length;
+}
+
+async function syncInvestmentsForPersistedItem(
+  plaidItem: PlaidItemWithAccounts
+): Promise<InvestmentSyncResult | null> {
+  const investmentAccountIds = getInvestmentAccountIds(plaidItem);
+  if (investmentAccountIds.length === 0) {
+    return null;
+  }
+
+  const plaidClient = getPlaidApi();
+  const accessToken = getAccessToken(plaidItem);
+  const asOf = new Date();
+
+  const holdingsResponse = await plaidClient.investmentsHoldingsGet({
+    access_token: accessToken,
+    options: {
+      account_ids: investmentAccountIds
+    }
+  });
+
+  await upsertInvestmentAccountBalances(plaidItem, holdingsResponse.data.accounts);
+  const holdingsCount = await createHoldingSnapshotsForItem(
+    plaidItem,
+    holdingsResponse.data.holdings,
+    holdingsResponse.data.securities,
+    asOf
+  );
+
+  const endDate = asOf.toISOString().slice(0, 10);
+  const startDate = new Date(asOf);
+  startDate.setUTCFullYear(startDate.getUTCFullYear() - 1);
+  const startDateKey = startDate.toISOString().slice(0, 10);
+  const investmentTransactions: PlaidInvestmentTransaction[] = [];
+  let offset = 0;
+  const pageSize = 100;
+  let totalInvestmentTransactions = 0;
+  let securities = holdingsResponse.data.securities;
+
+  do {
+    const response = await plaidClient.investmentsTransactionsGet({
+      access_token: accessToken,
+      start_date: startDateKey,
+      end_date: endDate,
+      options: {
+        account_ids: investmentAccountIds,
+        count: pageSize,
+        offset
+      }
+    });
+
+    totalInvestmentTransactions = response.data.total_investment_transactions;
+    securities = response.data.securities;
+    investmentTransactions.push(...response.data.investment_transactions);
+    offset += response.data.investment_transactions.length;
+  } while (offset < totalInvestmentTransactions);
+
+  const investmentTransactionCount = await upsertInvestmentTransactionsForItem(
+    plaidItem,
+    investmentTransactions,
+    securities
+  );
+
+  await prisma.plaidItem.update({
+    where: {
+      id: plaidItem.id
+    },
+    data: {
+      lastSyncedAt: new Date(),
+      status: PlaidItemStatus.active,
+      errorCode: null
+    }
+  });
+
+  return {
+    plaidItemId: plaidItem.plaidItemId,
+    institutionName: plaidItem.institutionName,
+    holdingsCount,
+    investmentTransactionCount,
+    accountCount: investmentAccountIds.length,
+    asOf: asOf.toISOString()
+  };
+}
+
+export async function syncInvestmentsForLinkedItems() {
+  const plaidItems = await listPersistedPlaidItems();
+  if (plaidItems.length === 0) {
+    return {
+      syncedItems: [],
+      totalHoldings: 0,
+      totalInvestmentTransactions: 0,
+      failedItems: []
+    };
+  }
+
+  const syncedItems: InvestmentSyncResult[] = [];
+  const failedItems: Array<{
+    plaidItemId: string;
+    institutionName: string | null;
+    errorCode: string | null;
+    error: string;
+  }> = [];
+
+  for (const plaidItem of plaidItems) {
+    try {
+      const result = await syncInvestmentsForPersistedItem(plaidItem);
+      if (result) {
+        syncedItems.push(result);
+      }
+    } catch (error) {
+      failedItems.push({
+        plaidItemId: plaidItem.id,
+        institutionName: plaidItem.institutionName,
+        errorCode: getPlaidErrorCode(error) ?? null,
+        error: getPlaidErrorMessage(error)
+      });
+    }
+  }
+
+  return {
+    syncedItems,
+    totalHoldings: syncedItems.reduce((sum, item) => sum + item.holdingsCount, 0),
+    totalInvestmentTransactions: syncedItems.reduce(
+      (sum, item) => sum + item.investmentTransactionCount,
+      0
+    ),
+    failedItems
+  };
+}
+
+export async function syncInvestmentsForPlaidItem(plaidItemId: string) {
+  const plaidItem = await findPersistedPlaidItemById(plaidItemId);
+  if (!plaidItem) {
+    throw new Error("Unable to find the linked institution to sync.");
+  }
+
+  return syncInvestmentsForPersistedItem(plaidItem);
+}
+
 export async function refreshPlaidItem(plaidItemId: string) {
   const plaidItem = await findPersistedPlaidItemById(plaidItemId);
   if (!plaidItem) {
@@ -805,6 +1162,7 @@ export async function refreshPlaidItem(plaidItemId: string) {
   });
 
   let syncResult = null;
+  let investmentSyncResult = null;
 
   try {
     syncResult = await syncTransactionsForPersistedItem({
@@ -816,6 +1174,19 @@ export async function refreshPlaidItem(plaidItemId: string) {
     await markPlaidItemFromError(persisted.plaidItem.id, error);
   }
 
+  try {
+    investmentSyncResult = await syncInvestmentsForPersistedItem({
+      ...plaidItem,
+      ...persisted.plaidItem,
+      accounts: persisted.accounts
+    });
+  } catch (error) {
+    const plaidErrorCode = getPlaidErrorCode(error);
+    if (plaidErrorCode !== "INVALID_PRODUCT") {
+      await markPlaidItemFromError(persisted.plaidItem.id, error);
+    }
+  }
+
   return {
     item: {
       id: persisted.plaidItem.id,
@@ -825,7 +1196,8 @@ export async function refreshPlaidItem(plaidItemId: string) {
       status: persisted.plaidItem.status
     },
     accounts: persisted.accounts,
-    syncResult
+    syncResult,
+    investmentSyncResult
   };
 }
 
@@ -902,6 +1274,31 @@ export async function handlePlaidWebhook(payload: PlaidWebhookPayload) {
       handled: true,
       action: "ignored_transactions_webhook"
     };
+  }
+
+  if (
+    payload.webhook_type === "HOLDINGS" ||
+    payload.webhook_type === "INVESTMENTS_TRANSACTIONS"
+  ) {
+    await updateLastWebhook();
+
+    try {
+      const syncResult = await syncInvestmentsForPersistedItem(plaidItem);
+
+      return {
+        handled: true,
+        action: "synced_investments",
+        syncResult
+      };
+    } catch (error) {
+      const plaidError = await markPlaidItemFromError(plaidItem.id, error);
+
+      return {
+        handled: false,
+        action: "investment_sync_failed",
+        ...plaidError
+      };
+    }
   }
 
   if (payload.webhook_type === "ITEM") {

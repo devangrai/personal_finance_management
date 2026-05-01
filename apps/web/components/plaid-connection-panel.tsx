@@ -327,6 +327,54 @@ type AdvisorPlanResponse = {
   };
 };
 
+type InvestmentsSummaryResponse = {
+  totals: {
+    accountCount: number;
+    holdingsCount: number;
+    investmentTransactionCount: number;
+    totalBalance: string;
+    retirementBalance: string;
+    taxableBalance: string;
+    latestSnapshotAt: string | null;
+  };
+  accounts: Array<{
+    id: string;
+    name: string;
+    officialName: string | null;
+    mask: string | null;
+    subtype: string | null;
+    currentBalance: string;
+    institutionName: string | null;
+    bucket: "retirement" | "taxable" | "other";
+    holdingCount: number;
+    lastHoldingsAsOf: string | null;
+  }>;
+  topHoldings: Array<{
+    accountId: string;
+    accountName: string;
+    institutionName: string | null;
+    securityName: string;
+    symbol: string | null;
+    institutionValue: string;
+    quantity: string | null;
+    asOf: string;
+  }>;
+  recentTransactions: Array<{
+    id: string;
+    date: string;
+    name: string;
+    type: string;
+    subtype: string | null;
+    amount: string;
+    quantity: string | null;
+    price: string | null;
+    symbol: string | null;
+    accountName: string;
+    accountSubtype: string | null;
+    institutionName: string | null;
+  }>;
+};
+
 const plaidSetupSteps = [
   "Create a free Plaid developer account and open the Dashboard.",
   "Copy your Sandbox client_id and secret into the app .env file.",
@@ -449,6 +497,17 @@ function formatHousingStatus(value: UserProfileSnapshot["housingStatus"]) {
   }
 }
 
+function formatInvestmentBucket(value: "retirement" | "taxable" | "other") {
+  switch (value) {
+    case "retirement":
+      return "Retirement";
+    case "taxable":
+      return "Taxable";
+    default:
+      return "Other";
+  }
+}
+
 function PlaidLinkLauncher({
   linkToken,
   linkSession,
@@ -502,6 +561,8 @@ export function PlaidConnectionPanel() {
   const [retirementRecommendation, setRetirementRecommendation] =
     useState<RetirementRecommendationResponse | null>(null);
   const [advisorPlan, setAdvisorPlan] = useState<AdvisorPlanResponse | null>(null);
+  const [investmentsSummary, setInvestmentsSummary] =
+    useState<InvestmentsSummaryResponse | null>(null);
   const [profileForm, setProfileForm] = useState({
     housingStatus: "rent_free" as UserProfileSnapshot["housingStatus"],
     biweeklyNetPay: "",
@@ -524,6 +585,7 @@ export function PlaidConnectionPanel() {
   const [retirementRecommendationError, setRetirementRecommendationError] =
     useState<string | null>(null);
   const [advisorPlanError, setAdvisorPlanError] = useState<string | null>(null);
+  const [investmentsError, setInvestmentsError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [linkSession, setLinkSession] = useState<StoredPlaidLinkSession | null>(null);
@@ -537,8 +599,10 @@ export function PlaidConnectionPanel() {
   const [isLoadingRetirementRecommendation, setIsLoadingRetirementRecommendation] =
     useState(true);
   const [isLoadingAdvisorPlan, setIsLoadingAdvisorPlan] = useState(true);
+  const [isLoadingInvestments, setIsLoadingInvestments] = useState(true);
   const [isCreatingLinkToken, setIsCreatingLinkToken] = useState(false);
   const [isSyncingTransactions, setIsSyncingTransactions] = useState(false);
+  const [isSyncingInvestments, setIsSyncingInvestments] = useState(false);
   const [isAutoCategorizing, setIsAutoCategorizing] = useState(false);
   const [isRunningDailyReview, setIsRunningDailyReview] = useState(false);
   const [isApplyingSuggestedRules, setIsApplyingSuggestedRules] = useState(false);
@@ -840,6 +904,32 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  async function refreshInvestmentsSummary() {
+    setIsLoadingInvestments(true);
+    setInvestmentsError(null);
+
+    try {
+      const response = await fetch("/api/investments/summary", {
+        method: "GET"
+      });
+      const payload = (await response.json()) as InvestmentsSummaryResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to load investments summary.");
+      }
+
+      setInvestmentsSummary(payload);
+    } catch (error) {
+      setInvestmentsError(
+        error instanceof Error ? error.message : "Unable to load investments summary."
+      );
+    } finally {
+      setIsLoadingInvestments(false);
+    }
+  }
+
   useEffect(() => {
     void refreshAccounts();
     void refreshCategories();
@@ -850,6 +940,7 @@ export function PlaidConnectionPanel() {
     void refreshProfile();
     void refreshRetirementRecommendation();
     void refreshAdvisorPlan();
+    void refreshInvestmentsSummary();
   }, []);
 
   useEffect(() => {
@@ -931,6 +1022,7 @@ export function PlaidConnectionPanel() {
     await refreshCashflowSummary();
     await refreshRetirementRecommendation();
     await refreshAdvisorPlan();
+    await refreshInvestmentsSummary();
     await refreshRecurringSummary();
     await refreshDailyReviewDigest();
     await refreshSuggestedRules();
@@ -1045,6 +1137,46 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  async function handleSyncInvestments() {
+    setIsSyncingInvestments(true);
+    setStatusMessage("Syncing investments from Plaid...");
+
+    try {
+      const response = await fetch("/api/investments/sync", {
+        method: "POST"
+      });
+      const payload = (await response.json()) as {
+        totalHoldings?: number;
+        totalInvestmentTransactions?: number;
+        failedItems?: Array<{
+          institutionName: string | null;
+          error: string;
+        }>;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to sync investments.");
+      }
+
+      await Promise.all([refreshAccounts(), refreshInvestmentsSummary()]);
+      await refreshAdvisorPlan();
+      const failureSuffix =
+        payload.failedItems && payload.failedItems.length > 0
+          ? ` ${payload.failedItems.length} institution(s) still need attention.`
+          : "";
+      setStatusMessage(
+        `Investments synced. Captured ${payload.totalHoldings ?? 0} holdings and ${payload.totalInvestmentTransactions ?? 0} investment transactions.${failureSuffix}`
+      );
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "Unable to sync investments."
+      );
+    } finally {
+      setIsSyncingInvestments(false);
+    }
+  }
+
   async function handleDisconnectItem(plaidItemId: string, institutionName: string) {
     const confirmed = window.confirm(
       `Disconnect ${institutionName} and delete its linked accounts and transactions from this app?`
@@ -1071,6 +1203,7 @@ export function PlaidConnectionPanel() {
       await refreshCashflowSummary();
       await refreshRetirementRecommendation();
       await refreshAdvisorPlan();
+      await refreshInvestmentsSummary();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       await refreshSuggestedRules();
@@ -1684,6 +1817,167 @@ export function PlaidConnectionPanel() {
                 </div>
               </article>
             </div>
+          </>
+        )}
+      </div>
+
+      <div className="advisorBlock">
+        <div className="accountsHeader">
+          <div>
+            <h3>Investments groundwork</h3>
+            <p className="panelCopy">
+              This is the bridge to Fidelity. Once Plaid Investments is enabled
+              and a brokerage or retirement institution is linked, the app can
+              sync holdings and investment transactions into the same ledger.
+            </p>
+          </div>
+          <div className="buttonRow">
+            <button
+              className="secondaryButton"
+              disabled={isSyncingInvestments}
+              onClick={() => void handleSyncInvestments()}
+              type="button"
+            >
+              {isSyncingInvestments ? "Syncing..." : "Sync investments"}
+            </button>
+            <button
+              className="secondaryButton"
+              disabled={isLoadingInvestments}
+              onClick={() => void refreshInvestmentsSummary()}
+              type="button"
+            >
+              Refresh investments
+            </button>
+          </div>
+        </div>
+
+        {isLoadingInvestments ? (
+          <p className="panelCopy">Loading investments summary...</p>
+        ) : investmentsError ? (
+          <p className="errorLine">{investmentsError}</p>
+        ) : !investmentsSummary || investmentsSummary.totals.accountCount === 0 ? (
+          <p className="panelCopy">
+            No investment accounts are synced yet. This section will populate
+            after you enable Plaid Investments and link an institution such as Fidelity.
+          </p>
+        ) : (
+          <>
+            <div className="summaryGrid">
+              <article className="summaryCard">
+                <p className="summaryLabel">Total investment balance</p>
+                <p className="summaryValue">
+                  {formatCurrency(investmentsSummary.totals.totalBalance)}
+                </p>
+                <p className="summaryMeta">
+                  Across {investmentsSummary.totals.accountCount} investment account(s)
+                </p>
+              </article>
+              <article className="summaryCard">
+                <p className="summaryLabel">Retirement balance</p>
+                <p className="summaryValue">
+                  {formatCurrency(investmentsSummary.totals.retirementBalance)}
+                </p>
+                <p className="summaryMeta">
+                  Taxable balance: {formatCurrency(investmentsSummary.totals.taxableBalance)}
+                </p>
+              </article>
+              <article className="summaryCard">
+                <p className="summaryLabel">Latest holdings snapshot</p>
+                <p className="summaryValue">
+                  {investmentsSummary.totals.holdingsCount}
+                </p>
+                <p className="summaryMeta">
+                  {investmentsSummary.totals.latestSnapshotAt
+                    ? `As of ${formatTransactionDate(
+                        investmentsSummary.totals.latestSnapshotAt
+                      )}`
+                    : "Snapshot pending"}
+                </p>
+              </article>
+              <article className="summaryCard">
+                <p className="summaryLabel">Investment transactions</p>
+                <p className="summaryValue">
+                  {investmentsSummary.totals.investmentTransactionCount}
+                </p>
+                <p className="summaryMeta">Stored investment cashflow events</p>
+              </article>
+            </div>
+
+            <div className="grid gridWide recurringGrid">
+              <article className="card">
+                <h3>Investment accounts</h3>
+                <ul className="list tightList">
+                  {investmentsSummary.accounts.map((account) => (
+                    <li key={account.id}>
+                      <strong>{account.institutionName ?? "Institution"} · {account.name}</strong>
+                      {" · "}
+                      {formatInvestmentBucket(account.bucket)}
+                      {" · "}
+                      {formatCurrency(account.currentBalance)}
+                      {account.subtype ? ` · ${account.subtype}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+
+              <article className="card">
+                <h3>Largest current holdings</h3>
+                {investmentsSummary.topHoldings.length === 0 ? (
+                  <p className="panelCopy">
+                    No holdings snapshot yet. Sync investments after linking an investments-enabled institution.
+                  </p>
+                ) : (
+                  <ul className="list tightList">
+                    {investmentsSummary.topHoldings.map((holding) => (
+                      <li key={`${holding.accountId}-${holding.securityName}-${holding.asOf}`}>
+                        <strong>{holding.symbol ?? holding.securityName}</strong>:{" "}
+                        {formatCurrency(holding.institutionValue)}
+                        {" · "}
+                        {holding.accountName}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </article>
+            </div>
+
+            <article className="card">
+              <h3>Recent investment transactions</h3>
+              {investmentsSummary.recentTransactions.length === 0 ? (
+                <p className="panelCopy">
+                  No investment transactions are stored yet. Once Fidelity or another investments institution is linked, this list can help us identify contribution patterns.
+                </p>
+              ) : (
+                <div className="tableWrap compactTableWrap">
+                  <table className="summaryTable">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Account</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {investmentsSummary.recentTransactions.map((transaction) => (
+                        <tr key={transaction.id}>
+                          <td>{formatTransactionDate(transaction.date)}</td>
+                          <td>
+                            {transaction.symbol
+                              ? `${transaction.symbol} · ${transaction.name}`
+                              : transaction.name}
+                          </td>
+                          <td>{transaction.accountName}</td>
+                          <td>{transaction.subtype ?? transaction.type}</td>
+                          <td>{formatCurrency(transaction.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </article>
           </>
         )}
       </div>
