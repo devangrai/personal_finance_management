@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   type PlaidLinkError,
@@ -15,6 +15,7 @@ import {
   writePlaidLinkSession
 } from "@/lib/plaid-link-session";
 import { formatCanonicalDate, formatLocalTimestamp } from "@/lib/date-utils";
+import { AdvisorChat } from "@/components/advisor-chat";
 
 type PlaidLinkLauncherProps = {
   linkToken: string | null;
@@ -520,6 +521,14 @@ function formatCurrency(value: string) {
     style: "currency",
     currency: "USD"
   }).format(Number(value));
+}
+
+function parseMoneyString(value: string | null | undefined) {
+  return value ? Number(value) : 0;
+}
+
+function formatPercent(value: number) {
+  return `${value.toFixed(0)}%`;
 }
 
 function formatFrequency(value: RecurringCandidate["frequency"]) {
@@ -1208,6 +1217,136 @@ export function PlaidConnectionPanel() {
     return Array.from(items.values());
   }, [accounts]);
 
+  const reviewQueue = useMemo(
+    () =>
+      transactions
+        .filter(
+          (transaction) =>
+            transaction.reviewStatus === "uncategorized" ||
+            transaction.reviewStatus === "auto_categorized"
+        )
+        .slice(0, 6),
+    [transactions]
+  );
+
+  const dashboardActionItems = useMemo(() => {
+    const items: Array<{
+      title: string;
+      detail: string;
+    }> = [];
+
+    if (!profileForm.biweeklyNetPay) {
+      items.push({
+        title: "Add your biweekly net pay",
+        detail:
+          "The advisor is already reading Fidelity contribution flows, but this one input will tighten the recommendation layer considerably."
+      });
+    }
+
+    if (reviewQueue.length > 0) {
+      items.push({
+        title: `Review ${reviewQueue.length} recent transaction${reviewQueue.length === 1 ? "" : "s"}`,
+        detail:
+          "These are the newest items still marked auto-categorized or uncategorized, so they are the highest-leverage cleanup pass."
+      });
+    }
+
+    if (suggestedRules.length > 0) {
+      items.push({
+        title: `Create ${suggestedRules.length} reusable rule${suggestedRules.length === 1 ? "" : "s"}`,
+        detail:
+          "Repeated merchant patterns are ready to become permanent rules so tomorrow's review queue gets smaller."
+      });
+    }
+
+    if ((investmentsSummary?.totals.holdingsCount ?? 0) === 0) {
+      items.push({
+        title: "Import a holdings snapshot next",
+        detail:
+          "The cashflow side is strong now. A holdings snapshot is the next step toward better portfolio allocation advice."
+      });
+    }
+
+    if (items.length === 0) {
+      items.push({
+        title: "Cash flow looks operational",
+        detail:
+          "The next upgrade is more about precision than cleanup: richer payroll inputs and holdings snapshots."
+      });
+    }
+
+    return items.slice(0, 4);
+  }, [
+    investmentsSummary?.totals.holdingsCount,
+    profileForm.biweeklyNetPay,
+    reviewQueue.length,
+    suggestedRules.length
+  ]);
+
+  const chatSuggestedPrompts = useMemo(() => {
+    if (!profileForm.biweeklyNetPay) {
+      return [
+        "What should I enter for my biweekly net pay to improve the advisor?",
+        "How does my current retirement flow compare to take-home pay?",
+        "What should I review in the latest transactions?",
+        "How much is going into brokerage versus retirement right now?"
+      ];
+    }
+
+    return [
+      "Am I saving too aggressively for retirement right now?",
+      "How should I split the next paycheck?",
+      "How much exact money is flowing into brokerage versus 401(k)?",
+      "What still looks noisy in my recent money flow?"
+    ];
+  }, [profileForm.biweeklyNetPay]);
+
+  const missionFlow = useMemo(() => {
+    if (!advisorPlan) {
+      return null;
+    }
+
+    const takeHomeBaseline = parseMoneyString(
+      advisorPlan.paycheckFlow.takeHomeBaselineBiweekly
+    );
+    const pretax401k = parseMoneyString(
+      advisorPlan.paycheckFlow.currentBiweeklyTraditional401kContribution
+    );
+    const roth401k = parseMoneyString(
+      advisorPlan.paycheckFlow.currentBiweeklyRoth401kContribution
+    );
+    const hsaEmployee = parseMoneyString(
+      advisorPlan.paycheckFlow.currentBiweeklyHsaEmployeeContribution
+    );
+    const hsaEmployer = parseMoneyString(
+      advisorPlan.paycheckFlow.currentBiweeklyHsaEmployerContribution
+    );
+    const brokerage = parseMoneyString(
+      advisorPlan.paycheckFlow.currentBiweeklyTaxableBrokerageDeposit
+    );
+    const spendingBiweekly =
+      parseMoneyString(advisorPlan.facts.averageMonthlySpending) * (12 / 26);
+    const flexCash = Math.max(takeHomeBaseline - brokerage - spendingBiweekly, 0);
+    const payrollTotal = Math.max(pretax401k + roth401k + hsaEmployee, 1);
+    const takeHomeTotal = Math.max(
+      brokerage + spendingBiweekly + flexCash,
+      takeHomeBaseline || 1
+    );
+
+    return {
+      takeHomeBaseline,
+      pretax401k,
+      roth401k,
+      hsaEmployee,
+      hsaEmployer,
+      brokerage,
+      spendingBiweekly,
+      flexCash,
+      payrollTotal,
+      takeHomeTotal
+    };
+  }, [advisorPlan]);
+
   function clearLinkState() {
     setLinkToken(null);
     setLinkSession(null);
@@ -1740,77 +1879,515 @@ export function PlaidConnectionPanel() {
   }
 
   return (
-    <section className="panel">
-      <div className="panelHeader">
-        <div>
-          <h2>Connect and inspect linked accounts</h2>
-          <p className="panelCopy">
-            This is the first usable milestone: create a Plaid Link token, link
-            an institution, exchange the public token, and confirm the accounts
-            were persisted.
-          </p>
-        </div>
-        <button
-          className="primaryButton"
-          disabled={isCreatingLinkToken}
-          onClick={() => void handleConnectClick()}
-          type="button"
-        >
-          {isCreatingLinkToken ? "Preparing Link..." : "Connect bank/card"}
-        </button>
-      </div>
+    <>
+      <PlaidLinkLauncher
+        key={linkLauncherKey}
+        linkToken={linkToken}
+        linkSession={linkSession}
+        onExit={(error: PlaidLinkError | null) => {
+          if (error) {
+            setStatusMessage(
+              error.error_message ?? "Plaid Link exited with an error."
+            );
+          } else {
+            setStatusMessage(
+              "Plaid Link closed before account connection completed."
+            );
+          }
 
-      <div className="grid gridWide">
-        <PlaidLinkLauncher
-          key={linkLauncherKey}
-          linkToken={linkToken}
-          linkSession={linkSession}
-          onExit={(error: PlaidLinkError | null) => {
-            if (error) {
-              setStatusMessage(
-                error.error_message ?? "Plaid Link exited with an error."
-              );
-            } else {
-              setStatusMessage(
-                "Plaid Link closed before account connection completed."
-              );
-            }
+          clearLinkState();
+        }}
+        onOpened={() => {
+          setPendingOpen(false);
+        }}
+        onReadyChange={setIsLinkReady}
+        onSuccess={async (
+          publicToken: string,
+          metadata: PlaidLinkOnSuccessMetadata,
+          session: StoredPlaidLinkSession | null
+        ) => {
+          const activeSession = session ?? readPlaidLinkSession();
+          setStatusMessage(
+            activeSession?.mode === "update"
+              ? "Refreshing the linked institution after re-authentication..."
+              : "Exchanging public token and saving linked accounts..."
+          );
 
-            clearLinkState();
-          }}
-          onOpened={() => {
-            setPendingOpen(false);
-          }}
-          onReadyChange={setIsLinkReady}
-          onSuccess={async (
-            publicToken: string,
-            metadata: PlaidLinkOnSuccessMetadata,
-            session: StoredPlaidLinkSession | null
-          ) => {
-            const activeSession = session ?? readPlaidLinkSession();
+          try {
+            await completeLinkSession(publicToken, metadata, activeSession);
             setStatusMessage(
               activeSession?.mode === "update"
-                ? "Refreshing the linked institution after re-authentication..."
-                : "Exchanging public token and saving linked accounts..."
+                ? "Institution re-authenticated successfully."
+                : "Linked account saved successfully."
             );
+          } catch (error) {
+            setStatusMessage(
+              error instanceof Error
+                ? error.message
+                : "Unable to exchange public token."
+            );
+          }
+        }}
+        pendingOpen={pendingOpen}
+      />
 
-            try {
-              await completeLinkSession(publicToken, metadata, activeSession);
-              setStatusMessage(
-                activeSession?.mode === "update"
-                  ? "Institution re-authenticated successfully."
-                  : "Linked account saved successfully."
-              );
-            } catch (error) {
-              setStatusMessage(
-                error instanceof Error
-                  ? error.message
-                  : "Unable to exchange public token."
-              );
-            }
-          }}
-          pendingOpen={pendingOpen}
-        />
+      <section className="missionShell">
+        <div className="missionHero">
+          <div className="missionHeroCopy">
+            <p className="eyebrow">Money flow command center</p>
+            <h2>See the paycheck, the review queue, and the next move in one place.</h2>
+            <p className="panelCopy missionIntro">
+              This view is the product’s real center of gravity: money comes in,
+              flows through retirement and brokerage accounts, and leaves behind a
+              queue of transactions that still need your confirmation.
+            </p>
+            <div className="buttonRow missionActions">
+              <button
+                className="primaryButton"
+                disabled={isCreatingLinkToken}
+                onClick={() => void handleConnectClick()}
+                type="button"
+              >
+                {isCreatingLinkToken ? "Preparing Link..." : "Connect bank/card"}
+              </button>
+              <button
+                className="secondaryButton"
+                disabled={isCreatingLinkToken}
+                onClick={() => void handleConnectInvestmentsClick()}
+                type="button"
+              >
+                Connect investment account
+              </button>
+              <button
+                className="secondaryButton"
+                disabled={isSyncingTransactions || accounts.length === 0}
+                onClick={() => void handleSyncTransactions()}
+                type="button"
+              >
+                {isSyncingTransactions ? "Syncing..." : "Sync transactions"}
+              </button>
+              <button
+                className="secondaryButton"
+                onClick={async () => {
+                  await refreshRetirementRecommendation();
+                  await refreshAdvisorPlan();
+                }}
+                type="button"
+              >
+                Refresh advisor
+              </button>
+            </div>
+            <div className="missionStatus">
+              <span className="statusPill">
+                {statusMessage ?? "Ready. Link accounts, review transactions, and tighten the model."}
+              </span>
+              <span className="statusMeta">
+                Link ready: {isLinkReady ? "yes" : linkToken ? "loading" : "not started"}
+              </span>
+            </div>
+          </div>
+
+          <div className="missionPulseGrid">
+            <article className="pulseCard">
+              <p className="pulseLabel">Needs Review</p>
+              <p className="pulseValue">
+                {dailyReviewDigest?.needsReviewCount ?? reviewQueue.length}
+              </p>
+              <p className="pulseMeta">
+                {dailyReviewDigest
+                  ? `${dailyReviewDigest.autoCategorizedCount} AI-labeled, ${dailyReviewDigest.uncategorizedCount} uncategorized`
+                  : "Recent queue from the latest synced transactions"}
+              </p>
+            </article>
+            <article className="pulseCard">
+              <p className="pulseLabel">Linked Institutions</p>
+              <p className="pulseValue">{linkedItems.length}</p>
+              <p className="pulseMeta">
+                {accounts.length} active account{accounts.length === 1 ? "" : "s"} across banks, cards, and cash.
+              </p>
+            </article>
+            <article className="pulseCard">
+              <p className="pulseLabel">Retirement Flow</p>
+              <p className="pulseValue">
+                {advisorPlan
+                  ? formatCurrency(
+                      advisorPlan.paycheckFlow.currentBiweeklyRetirementContribution
+                    )
+                  : "—"}
+              </p>
+              <p className="pulseMeta">
+                Observed 401(k) and Fidelity retirement contribution pace per cycle.
+              </p>
+            </article>
+            <article className="pulseCard">
+              <p className="pulseLabel">Investment Events</p>
+              <p className="pulseValue">
+                {investmentsSummary?.totals.investmentTransactionCount ?? 0}
+              </p>
+              <p className="pulseMeta">
+                Imported or synced Fidelity-side cashflow events ready for advisor analysis.
+              </p>
+            </article>
+          </div>
+        </div>
+
+        <div className="missionGrid">
+          <article className="missionCard flowCard">
+            <div className="sectionLabelRow">
+              <div>
+                <p className="eyebrow">Money Flow</p>
+                <h3>How the paycheck is moving right now</h3>
+              </div>
+              {missionFlow ? (
+                <p className="flowHeadline">
+                  {missionFlow.takeHomeBaseline > 0
+                    ? `${formatCurrency(missionFlow.takeHomeBaseline.toFixed(2))} take-home baseline`
+                    : "Observed retirement and brokerage cycles are available"}
+                </p>
+              ) : null}
+            </div>
+            {!advisorPlan || !missionFlow ? (
+              <p className="panelCopy">
+                Waiting on advisor data before the flow map can render.
+              </p>
+            ) : (
+              <>
+                <div className="flowGrid">
+                  <section className="flowLane">
+                    <div className="flowLaneHeader">
+                      <h4>Payroll split</h4>
+                      <p className="panelCopy">
+                        Contributions observed before or alongside the net paycheck.
+                      </p>
+                    </div>
+                    <div className="flowBars">
+                      <article className="flowNode flowNodeSource">
+                        <span className="flowNodeLabel">Paycheck</span>
+                        <strong>
+                          {missionFlow.takeHomeBaseline > 0
+                            ? formatCurrency(missionFlow.takeHomeBaseline.toFixed(2))
+                            : "Observed"}
+                        </strong>
+                      </article>
+                      <div className="flowBranchList">
+                        {[
+                          {
+                            label: "401(k)",
+                            value: missionFlow.pretax401k,
+                            note: "Pre-tax"
+                          },
+                          {
+                            label: "Roth 401(k)",
+                            value: missionFlow.roth401k,
+                            note: "After-tax"
+                          },
+                          {
+                            label: "HSA",
+                            value: missionFlow.hsaEmployee,
+                            note: missionFlow.hsaEmployer
+                              ? `Employer + ${formatCurrency(missionFlow.hsaEmployer.toFixed(2))}`
+                              : "Employee contribution"
+                          }
+                        ].map((branch) => {
+                          const share = Math.max(
+                            (branch.value / missionFlow.payrollTotal) * 100,
+                            10
+                          );
+
+                          return (
+                            <div
+                              key={branch.label}
+                              className="flowBranch"
+                              style={
+                                {
+                                  "--flow-share": `${share}%`
+                                } as CSSProperties
+                              }
+                            >
+                              <div className="flowBranchBar" />
+                              <div className="flowBranchBody">
+                                <span className="flowNodeLabel">{branch.label}</span>
+                                <strong>
+                                  {formatCurrency(branch.value.toFixed(2))}
+                                </strong>
+                                <span className="flowBranchNote">{branch.note}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="flowLane">
+                    <div className="flowLaneHeader">
+                      <h4>Take-home split</h4>
+                      <p className="panelCopy">
+                        What the observed net paycheck appears to fund after it lands.
+                      </p>
+                    </div>
+                    <div className="flowBars">
+                      <article className="flowNode flowNodeSource flowNodeNet">
+                        <span className="flowNodeLabel">Net cash</span>
+                        <strong>
+                          {missionFlow.takeHomeBaseline > 0
+                            ? formatCurrency(missionFlow.takeHomeBaseline.toFixed(2))
+                            : "Unknown"}
+                        </strong>
+                      </article>
+                      <div className="flowBranchList">
+                        {[
+                          {
+                            label: "Brokerage",
+                            value: missionFlow.brokerage,
+                            note: "Recurring Fidelity deposit"
+                          },
+                          {
+                            label: "Spending",
+                            value: missionFlow.spendingBiweekly,
+                            note: "Biweekly estimate from reviewed spend"
+                          },
+                          {
+                            label: "Flex cash",
+                            value: missionFlow.flexCash,
+                            note: "Residual room for buffer or decisions"
+                          }
+                        ].map((branch) => {
+                          const share = Math.max(
+                            (branch.value / missionFlow.takeHomeTotal) * 100,
+                            10
+                          );
+
+                          return (
+                            <div
+                              key={branch.label}
+                              className="flowBranch flowBranchNet"
+                              style={
+                                {
+                                  "--flow-share": `${share}%`
+                                } as CSSProperties
+                              }
+                            >
+                              <div className="flowBranchBar" />
+                              <div className="flowBranchBody">
+                                <span className="flowNodeLabel">{branch.label}</span>
+                                <strong>
+                                  {formatCurrency(branch.value.toFixed(2))}
+                                </strong>
+                                <span className="flowBranchNote">{branch.note}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <div className="flowNotes">
+                  {advisorPlan.paycheckFlow.notes.slice(0, 3).map((note) => (
+                    <p key={note} className="summaryMeta">
+                      {note}
+                    </p>
+                  ))}
+                </div>
+              </>
+            )}
+          </article>
+
+          <aside className="advisorRail">
+            <article className="missionCard advisorSummaryCard">
+              <div className="sectionLabelRow">
+                <div>
+                  <p className="eyebrow">Advisor</p>
+                  <h3>Suggested actions</h3>
+                </div>
+                <span className="advisorStatusBadge">
+                  {retirementRecommendation?.recommendation
+                    ? formatRetirementStatus(
+                        retirementRecommendation.recommendation.status
+                      )
+                    : "Loading"}
+                </span>
+              </div>
+              {retirementRecommendation?.recommendation ? (
+                <>
+                  <p className="adviceHeadline">
+                    {retirementRecommendation.recommendation.statusHeadline}
+                  </p>
+                  <p className="summaryMeta">
+                    Current observed retirement flow:{" "}
+                    {retirementRecommendation.recommendation
+                      .currentObservedBiweeklyContribution
+                      ? formatCurrency(
+                          retirementRecommendation.recommendation
+                            .currentObservedBiweeklyContribution
+                        )
+                      : "Not detected yet"}
+                  </p>
+                  <div className="advisorActionList">
+                    {dashboardActionItems.map((item) => (
+                      <article key={item.title} className="advisorActionCard">
+                        <strong>{item.title}</strong>
+                        <p>{item.detail}</p>
+                      </article>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="panelCopy">
+                  Advisor recommendations are still loading.
+                </p>
+              )}
+            </article>
+
+            <AdvisorChat suggestedPrompts={chatSuggestedPrompts} />
+          </aside>
+        </div>
+
+        <section className="missionCard reviewCard">
+          <div className="sectionLabelRow">
+            <div>
+              <p className="eyebrow">Today&apos;s Review</p>
+              <h3>Validate what the system still isn&apos;t fully sure about</h3>
+            </div>
+            <div className="buttonRow">
+              <button
+                className="secondaryButton"
+                disabled={isAutoCategorizing || isRunningDailyReview}
+                onClick={() => void handleAutoCategorizeTransactions()}
+                type="button"
+              >
+                {isAutoCategorizing ? "Reviewing..." : "AI review uncategorized"}
+              </button>
+              <button
+                className="secondaryButton"
+                disabled={isAutoCategorizing || isRunningDailyReview}
+                onClick={() => void handleRunDailyReview(false)}
+                type="button"
+              >
+                {isRunningDailyReview ? "Running..." : "Run today’s review"}
+              </button>
+            </div>
+          </div>
+          {reviewQueue.length === 0 ? (
+            <p className="panelCopy">
+              No recent transactions are currently waiting on review.
+            </p>
+          ) : (
+            <div className="reviewQueueList">
+              {reviewQueue.map((transaction) => (
+                <article key={transaction.id} className="reviewQueueItem">
+                  <div className="reviewQueueMain">
+                    <div>
+                      <p className="reviewQueueTitle">
+                        {transaction.merchantName ?? transaction.name}
+                      </p>
+                      <p className="reviewQueueMeta">
+                        {formatCalendarDate(transaction.date)} ·{" "}
+                        {transaction.account.plaidItem.institutionName ?? "Institution"} ·{" "}
+                        {transaction.account.name}
+                      </p>
+                    </div>
+                    <strong
+                      className={
+                        transaction.direction === "credit"
+                          ? "amountPositive"
+                          : "amountNegative"
+                      }
+                    >
+                      {formatTransactionAmount(transaction)}
+                    </strong>
+                  </div>
+                  <div className="reviewQueueControls">
+                    <div className="reviewSuggestion">
+                      <span className="reviewSuggestionLabel">
+                        {transaction.reviewStatus === "uncategorized"
+                          ? "Needs manual category"
+                          : `AI suggests ${transaction.aiSuggestedCategory?.label ?? "a category"}`}
+                      </span>
+                      {transaction.aiSuggestedConfidence != null ? (
+                        <span className="reviewSuggestionMeta">
+                          {transaction.aiSuggestedConfidence}%
+                        </span>
+                      ) : null}
+                    </div>
+                    <select
+                      className="categorySelect"
+                      disabled={
+                        savingTransactionId === transaction.id ||
+                        creatingRuleTransactionId === transaction.id
+                      }
+                      onChange={(event) =>
+                        void handleCategoryChange(
+                          transaction.id,
+                          event.target.value || null
+                        )
+                      }
+                      value={transaction.category?.id ?? ""}
+                    >
+                      <option value="">No review category</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.parentKey
+                            ? `${category.parentKey} / ${category.label}`
+                            : category.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="inlineActionButton"
+                      disabled={
+                        !transaction.category ||
+                        savingTransactionId === transaction.id ||
+                        creatingRuleTransactionId === transaction.id
+                      }
+                      onClick={() => void handleCreateRule(transaction.id)}
+                      type="button"
+                    >
+                      {creatingRuleTransactionId === transaction.id
+                        ? "Saving rule..."
+                        : "Save rule"}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </section>
+
+      <section className="panel opsPanel">
+        <div className="panelHeader">
+          <div>
+            <h2>Operations console</h2>
+            <p className="panelCopy">
+              The command center above is the daily experience. This lower area
+              keeps the detailed controls, raw summaries, imports, and tables that
+              make the system auditable.
+            </p>
+          </div>
+          <div className="buttonRow">
+            <button
+              className="secondaryButton"
+              disabled={isCreatingLinkToken}
+              onClick={() => void handleConnectClick()}
+              type="button"
+            >
+              {isCreatingLinkToken ? "Preparing Link..." : "Connect another bank/card"}
+            </button>
+            <button
+              className="secondaryButton"
+              disabled={isCreatingLinkToken}
+              onClick={() => void handleConnectInvestmentsClick()}
+              type="button"
+            >
+              Connect investment account
+            </button>
+          </div>
+        </div>
+
+      <div className="grid gridWide">
         <article className="card">
           <h3>Before you test</h3>
           <ol className="orderedList">
@@ -3310,6 +3887,7 @@ export function PlaidConnectionPanel() {
           </div>
         )}
       </div>
-    </section>
+      </section>
+    </>
   );
 }

@@ -1,11 +1,15 @@
 :root {
   color-scheme: light;
-  --bg: #f3efe6;
-  --panel: rgba(255, 252, 247, 0.88);
-  --ink: #1a1712;
-  --muted: #665f52;
-  --line: rgba(26, 23, 18, 0.1);
-  --accent: #0f766e;
+  --bg: #efe7da;
+  --panel: rgba(255, 251, 245, 0.9);
+  --ink: #171512;
+  --muted: #665d4e;
+  --line: rgba(23, 21, 18, 0.1);
+  --accent: #225f59;
+  --accent-deep: #163d4a;
+  --accent-soft: #dceae2;
+  --gold: #c9a96b;
+  --shadow: 0 22px 60px rgba(38, 31, 20, 0.08);
 }
 
 * {
@@ -17,10 +21,11 @@ body {
   margin: 0;
   min-height: 100%;
   background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), transparent 30%),
-    linear-gradient(180deg, #f8f4eb 0%, var(--bg) 100%);
+    radial-gradient(circle at top left, rgba(34, 95, 89, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(201, 169, 107, 0.14), transparent 24%),
+    linear-gradient(180deg, #faf5eb 0%, var(--bg) 100%);
   color: var(--ink);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
 }
 
 body {
@@ -28,13 +33,13 @@ body {
 }
 
 .shell {
-  width: min(1100px, calc(100% - 2rem));
+  width: min(1220px, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 4rem 0 5rem;
+  padding: 3rem 0 5rem;
 }
 
 .hero {
-  padding: 3rem 0 2rem;
+  padding: 2rem 0 1.5rem;
 }
 
 .hero h1,
@@ -44,10 +49,10 @@ body {
 }
 
 .hero h1 {
-  max-width: 12ch;
+  max-width: 14ch;
   margin: 0;
-  font-size: clamp(2.75rem, 7vw, 5.5rem);
-  line-height: 0.94;
+  font-size: clamp(2.9rem, 7vw, 5.2rem);
+  line-height: 0.95;
 }
 
 .eyebrow {
@@ -60,11 +65,31 @@ body {
 }
 
 .lede {
-  max-width: 42rem;
+  max-width: 48rem;
   margin: 1.5rem 0 0;
   color: var(--muted);
   font-size: 1.1rem;
   line-height: 1.6;
+}
+
+.heroCompact {
+  display: grid;
+  gap: 1rem;
+}
+
+.heroBullets {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.heroBullets span {
+  padding: 0.65rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--muted);
+  font-size: 0.92rem;
 }
 
 .panel {
@@ -74,6 +99,7 @@ body {
   border-radius: 24px;
   background: var(--panel);
   backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
 }
 
 .panel h2 {
@@ -139,7 +165,7 @@ body {
   padding: 1.2rem;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.64);
 }
 
 .card h3 {
@@ -410,6 +436,442 @@ body {
   font-size: 0.95rem;
 }
 
+.missionShell {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.missionHero,
+.missionCard {
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.94), rgba(255, 248, 241, 0.9));
+  box-shadow: var(--shadow);
+}
+
+.missionHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.95fr);
+  gap: 1.25rem;
+  padding: 1.5rem;
+}
+
+.missionHeroCopy {
+  display: grid;
+  gap: 1rem;
+}
+
+.missionHeroCopy h2 {
+  margin: 0;
+  max-width: 15ch;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+}
+
+.missionIntro {
+  max-width: 44rem;
+}
+
+.missionActions {
+  align-items: center;
+}
+
+.missionStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.72rem 1rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(34, 95, 89, 0.14), rgba(22, 61, 74, 0.08));
+  color: var(--ink);
+  border: 1px solid rgba(34, 95, 89, 0.16);
+}
+
+.statusMeta {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.missionPulseGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.pulseCard {
+  min-height: 156px;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(243, 251, 247, 0.88));
+}
+
+.pulseLabel {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pulseValue {
+  margin: 0.5rem 0 0.35rem;
+  font-size: clamp(1.6rem, 2vw, 2.35rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.pulseMeta {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.missionGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.8fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.missionCard {
+  padding: 1.35rem;
+}
+
+.flowCard {
+  overflow: hidden;
+}
+
+.sectionLabelRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sectionLabelRow h3 {
+  margin: 0.1rem 0 0;
+  font-size: 1.55rem;
+}
+
+.flowHeadline {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+}
+
+.flowGrid {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.flowLane {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.flowLaneHeader h4 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.flowBars {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.flowNode {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem;
+  border-radius: 18px;
+  color: #f8f3ea;
+  background: linear-gradient(135deg, var(--accent-deep), var(--accent));
+}
+
+.flowNodeNet {
+  background: linear-gradient(135deg, #345056, #225f59);
+}
+
+.flowNodeLabel {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.flowNode.flowNodeSource .flowNodeLabel {
+  color: rgba(248, 243, 234, 0.8);
+}
+
+.flowNode strong {
+  font-size: 1.45rem;
+  letter-spacing: -0.03em;
+}
+
+.flowBranchList {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.flowBranch {
+  display: grid;
+  grid-template-columns: minmax(48px, var(--flow-share)) minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: stretch;
+}
+
+.flowBranchBar {
+  min-height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(34, 95, 89, 0.22), rgba(22, 61, 74, 0.5));
+}
+
+.flowBranchNet .flowBranchBar {
+  background: linear-gradient(180deg, rgba(201, 169, 107, 0.24), rgba(34, 95, 89, 0.4));
+}
+
+.flowBranchBody {
+  display: grid;
+  gap: 0.22rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.flowBranchBody strong {
+  font-size: 1.18rem;
+}
+
+.flowBranchNote {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.flowNotes {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.advisorRail {
+  display: grid;
+  gap: 1rem;
+}
+
+.advisorStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(34, 95, 89, 0.1);
+  border: 1px solid rgba(34, 95, 89, 0.14);
+  color: var(--accent-deep);
+  font-size: 0.92rem;
+}
+
+.adviceHeadline {
+  margin: 0.9rem 0 0.55rem;
+  font-size: 1.15rem;
+  line-height: 1.5;
+}
+
+.advisorActionList {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.advisorActionCard {
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.advisorActionCard strong {
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.advisorActionCard p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.advisorChat {
+  padding: 1.1rem;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(248, 244, 236, 0.96), rgba(255, 255, 255, 0.82));
+}
+
+.advisorChatHeader {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.advisorChatHeader h3 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.advisorChatTranscript {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.8rem;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.advisorBubble {
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+}
+
+.advisorBubbleAssistant {
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.advisorBubbleUser {
+  background: linear-gradient(135deg, rgba(34, 95, 89, 0.08), rgba(201, 169, 107, 0.12));
+}
+
+.advisorBubbleRole,
+.advisorBubbleMeta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.advisorBubbleCopy {
+  margin: 0.35rem 0 0;
+  line-height: 1.65;
+}
+
+.advisorBubbleList {
+  margin-top: 0.65rem;
+}
+
+.advisorPromptRail {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.promptChip {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--ink);
+  padding: 0.55rem 0.85rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.promptChip:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.advisorChatComposer {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.advisorChatInput {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 0.9rem 1rem;
+  font: inherit;
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.advisorChatActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.reviewCard {
+  margin-top: 0;
+}
+
+.reviewQueueList {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.reviewQueueItem {
+  padding: 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.reviewQueueMain,
+.reviewQueueControls {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.reviewQueueControls {
+  margin-top: 0.9rem;
+  align-items: center;
+}
+
+.reviewQueueTitle {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.reviewQueueMeta,
+.reviewSuggestionLabel,
+.reviewSuggestionMeta {
+  margin: 0;
+  color: var(--muted);
+}
+
+.reviewSuggestion {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 210px;
+}
+
+.opsPanel {
+  margin-top: 1.6rem;
+}
+
 @media (max-width: 640px) {
   .shell {
     width: min(100% - 1.25rem, 1100px);
@@ -423,5 +885,37 @@ body {
   .panelHeader,
   .accountsHeader {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 960px) {
+  .missionHero,
+  .missionGrid,
+  .flowGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .missionPulseGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .reviewQueueMain,
+  .reviewQueueControls,
+  .sectionLabelRow,
+  .advisorChatActions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .missionPulseGrid,
+  .summaryGrid,
+  .profileGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .flowBranch {
+    grid-template-columns: 28px 1fr;
   }
 }
