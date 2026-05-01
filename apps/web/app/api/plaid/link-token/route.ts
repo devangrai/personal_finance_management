@@ -5,6 +5,7 @@ import { createLinkToken } from "@/lib/plaid";
 type CreateLinkTokenPayload = {
   mode?: "connect" | "update";
   plaidItemId?: string;
+  productScope?: "default" | "transactions" | "investments";
 };
 
 export async function POST(request: Request) {
@@ -19,14 +20,16 @@ export async function POST(request: Request) {
   try {
     const response = await createLinkToken({
       mode: payload.mode,
-      plaidItemId: payload.plaidItemId
+      plaidItemId: payload.plaidItemId,
+      productScope: payload.productScope
     });
 
     return NextResponse.json({
       linkToken: response.link_token,
       expiration: response.expiration,
       mode: payload.mode ?? "connect",
-      plaidItemId: payload.plaidItemId ?? null
+      plaidItemId: payload.plaidItemId ?? null,
+      productScope: payload.productScope ?? "default"
     });
   } catch (error) {
     return NextResponse.json(

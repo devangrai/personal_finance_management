@@ -4,6 +4,7 @@ import {
   type Holding,
   type InvestmentTransaction as PlaidInvestmentTransaction,
   type LinkTokenCreateResponse,
+  Products,
   type RemovedTransaction,
   type Transaction as PlaidTransaction,
   type TransactionsSyncRequest
@@ -37,6 +38,7 @@ type CreateLinkTokenInput = {
   mode?: LinkTokenMode;
   plaidItemId?: string;
   accountSelectionEnabled?: boolean;
+  productScope?: "default" | "transactions" | "investments";
 };
 
 type PersistPlaidItemInput = {
@@ -121,10 +123,39 @@ export function getPlaidApi() {
   });
 }
 
+function resolveRequestedLinkProducts(
+  configuredProducts: Products[],
+  productScope: CreateLinkTokenInput["productScope"]
+) {
+  if (!productScope || productScope === "default") {
+    return configuredProducts;
+  }
+
+  const scopedProducts = configuredProducts.filter((product) =>
+    productScope === "transactions"
+      ? product === Products.Transactions
+      : product === Products.Investments
+  );
+
+  if (scopedProducts.length === 0) {
+    throw new Error(
+      productScope === "transactions"
+        ? "Plaid Transactions is not enabled for this app."
+        : "Plaid Investments is not enabled for this app."
+    );
+  }
+
+  return scopedProducts;
+}
+
 export async function createLinkToken(input: CreateLinkTokenInput = {}) {
   const env = getAppEnv();
   const user = await getOrCreateDefaultUser();
   const plaidClient = getPlaidApi();
+  const requestedProducts = resolveRequestedLinkProducts(
+    env.plaidProducts,
+    input.productScope
+  );
   const linkTokenRequest = {
     client_name: env.plaidClientName,
     country_codes: env.plaidCountryCodes,
@@ -161,7 +192,7 @@ export async function createLinkToken(input: CreateLinkTokenInput = {}) {
 
   const response = await plaidClient.linkTokenCreate({
     ...linkTokenRequest,
-    products: env.plaidProducts,
+    products: requestedProducts
   });
 
   return response.data satisfies LinkTokenCreateResponse;

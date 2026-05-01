@@ -1032,13 +1032,16 @@ export function PlaidConnectionPanel() {
 
   async function handleStartLink(
     mode: StoredPlaidLinkSession["mode"],
-    plaidItemId?: string
+    plaidItemId?: string,
+    productScope: StoredPlaidLinkSession["productScope"] = "default"
   ) {
     setIsCreatingLinkToken(true);
     setStatusMessage(
       mode === "update"
         ? "Preparing Plaid Link for re-authentication..."
-        : "Creating a Plaid Link token..."
+        : productScope === "investments"
+          ? "Preparing Plaid Link for an investments institution..."
+          : "Creating a Plaid Link token..."
     );
 
     try {
@@ -1049,7 +1052,8 @@ export function PlaidConnectionPanel() {
         },
         body: JSON.stringify({
           mode,
-          plaidItemId
+          plaidItemId,
+          productScope
         })
       });
       const payload = (await response.json()) as {
@@ -1064,7 +1068,8 @@ export function PlaidConnectionPanel() {
       const session = {
         linkToken: payload.linkToken,
         mode,
-        plaidItemId: plaidItemId ?? null
+        plaidItemId: plaidItemId ?? null,
+        productScope
       } satisfies StoredPlaidLinkSession;
 
       setLinkSession(session);
@@ -1086,7 +1091,11 @@ export function PlaidConnectionPanel() {
   }
 
   async function handleConnectClick() {
-    await handleStartLink("connect");
+    await handleStartLink("connect", undefined, "transactions");
+  }
+
+  async function handleConnectInvestmentsClick() {
+    await handleStartLink("connect", undefined, "investments");
   }
 
   async function handleReconnectClick(plaidItemId: string) {
@@ -1507,7 +1516,7 @@ export function PlaidConnectionPanel() {
           onClick={() => void handleConnectClick()}
           type="button"
         >
-          {isCreatingLinkToken ? "Preparing Link..." : "Connect account"}
+          {isCreatingLinkToken ? "Preparing Link..." : "Connect bank/card"}
         </button>
       </div>
 
@@ -1833,6 +1842,14 @@ export function PlaidConnectionPanel() {
             </p>
           </div>
           <div className="buttonRow">
+            <button
+              className="secondaryButton"
+              disabled={isCreatingLinkToken}
+              onClick={() => void handleConnectInvestmentsClick()}
+              type="button"
+            >
+              {isCreatingLinkToken ? "Preparing Link..." : "Connect investment account"}
+            </button>
             <button
               className="secondaryButton"
               disabled={isSyncingInvestments}
