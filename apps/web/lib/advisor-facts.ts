@@ -24,6 +24,7 @@ export type AdvisorFactsSnapshot = {
 export type AdvisorFactsComputation = {
   averageMonthlyIncomeCents: number;
   averageMonthlyInvestingCents: number;
+  averageMonthlyFreeCashflowCents: number;
   averageMonthlyNetCashflowCents: number;
   averageMonthlyRecurringIncomeCents: number;
   averageMonthlyRecurringOutflowsCents: number;
@@ -90,9 +91,7 @@ function buildAdvisorFactsSnapshot(
       facts.averageMonthlyNetCashflowCents
     ),
     averageMonthlyFreeCashflow: centsToDollarsString(
-      facts.averageMonthlyIncomeCents -
-        facts.monthlyFixedExpenseCents -
-        facts.averageMonthlySpendingCents
+      facts.averageMonthlyFreeCashflowCents
     ),
     averageMonthlyRecurringIncome: centsToDollarsString(
       facts.averageMonthlyRecurringIncomeCents
@@ -140,9 +139,6 @@ export async function getAdvisorFactsComputation(): Promise<AdvisorFactsComputat
   const averageMonthlyInvestingCents = average(
     cashflow.months.map((month) => decimalStringToCents(month.investing))
   );
-  const averageMonthlyNetCashflowCents = average(
-    cashflow.months.map((month) => decimalStringToCents(month.netCashflow))
-  );
   const reviewedCoveragePercent =
     cashflow.latestMonth !== null
       ? Number((cashflow.latestMonth.reviewedSpendRatioBps / 100).toFixed(0))
@@ -165,6 +161,12 @@ export async function getAdvisorFactsComputation(): Promise<AdvisorFactsComputat
   const biweeklyNetPayCents = decimalStringToCents(profile.biweeklyNetPay);
   const monthlyCoreExpenseCents =
     monthlyFixedExpenseCents + averageMonthlySpendingCents;
+  const averageMonthlyNetCashflowCents =
+    averageMonthlyIncomeCents -
+    averageMonthlySpendingCents -
+    averageMonthlyInvestingCents;
+  const averageMonthlyFreeCashflowCents =
+    averageMonthlyNetCashflowCents - monthlyFixedExpenseCents;
   const emergencyFundRunwayMonths =
     monthlyCoreExpenseCents > 0
       ? liquidCashBalanceCents / monthlyCoreExpenseCents
@@ -173,6 +175,7 @@ export async function getAdvisorFactsComputation(): Promise<AdvisorFactsComputat
   return {
     averageMonthlyIncomeCents,
     averageMonthlyInvestingCents,
+    averageMonthlyFreeCashflowCents,
     averageMonthlyNetCashflowCents,
     averageMonthlyRecurringIncomeCents,
     averageMonthlyRecurringOutflowsCents,

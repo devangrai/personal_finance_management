@@ -14,6 +14,7 @@ import {
   type StoredPlaidLinkSession,
   writePlaidLinkSession
 } from "@/lib/plaid-link-session";
+import { formatCanonicalDate, formatLocalTimestamp } from "@/lib/date-utils";
 
 type PlaidLinkLauncherProps = {
   linkToken: string | null;
@@ -271,7 +272,7 @@ type RetirementRecommendationResponse = {
   inputs: {
     biweeklyNetPay: string | null;
     monthlyFixedExpense: string;
-    averageVariableMonthlyExpense: string;
+    observedMonthlyOutflows: string;
     emergencyFundTarget: string;
     housingStatus: string;
   };
@@ -405,12 +406,12 @@ function formatTransactionAmount(transaction: RecentTransaction) {
   }).format(Number(transaction.amount))}`;
 }
 
-function formatTransactionDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric"
-  }).format(new Date(value));
+function formatCalendarDate(value: string) {
+  return formatCanonicalDate(value);
+}
+
+function formatTimestamp(value: string) {
+  return formatLocalTimestamp(value);
 }
 
 function formatCurrency(value: string) {
@@ -1888,7 +1889,7 @@ export function PlaidConnectionPanel() {
                 </p>
                 <p className="summaryMeta">
                   {investmentsSummary.totals.latestSnapshotAt
-                    ? `As of ${formatTransactionDate(
+                    ? `As of ${formatTimestamp(
                         investmentsSummary.totals.latestSnapshotAt
                       )}`
                     : "Snapshot pending"}
@@ -1962,7 +1963,7 @@ export function PlaidConnectionPanel() {
                     <tbody>
                       {investmentsSummary.recentTransactions.map((transaction) => (
                         <tr key={transaction.id}>
-                          <td>{formatTransactionDate(transaction.date)}</td>
+                          <td>{formatCalendarDate(transaction.date)}</td>
                           <td>
                             {transaction.symbol
                               ? `${transaction.symbol} · ${transaction.name}`
@@ -2146,9 +2147,9 @@ export function PlaidConnectionPanel() {
                   ))}
                 </ul>
                 <p className="metaLine">
-                  Variable spend basis:{" "}
+                  Observed spending + investing basis:{" "}
                   {formatCurrency(
-                    retirementRecommendation.inputs.averageVariableMonthlyExpense
+                    retirementRecommendation.inputs.observedMonthlyOutflows
                   )}{" "}
                   per month
                 </p>
@@ -2420,11 +2421,11 @@ export function PlaidConnectionPanel() {
                     {item.plaidEnvironment}
                   </p>
                   <p className="metaLine">
-                    Last sync: {item.lastSyncedAt ? formatTransactionDate(item.lastSyncedAt) : "Never"}
+                    Last sync: {item.lastSyncedAt ? formatTimestamp(item.lastSyncedAt) : "Never"}
                   </p>
                   <p className="metaLine">
                     Last webhook:{" "}
-                    {item.lastWebhookAt ? formatTransactionDate(item.lastWebhookAt) : "Not received yet"}
+                    {item.lastWebhookAt ? formatTimestamp(item.lastWebhookAt) : "Not received yet"}
                   </p>
                   {item.errorCode ? (
                     <p className="metaLine">Plaid signal: {item.errorCode}</p>
@@ -2541,7 +2542,7 @@ export function PlaidConnectionPanel() {
               <tbody>
                 {transactions.map((transaction) => (
                   <tr key={transaction.id}>
-                    <td>{formatTransactionDate(transaction.date)}</td>
+                    <td>{formatCalendarDate(transaction.date)}</td>
                     <td>
                       <div className="tablePrimary">
                         {transaction.merchantName ?? transaction.name}

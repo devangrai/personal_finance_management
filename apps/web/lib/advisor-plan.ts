@@ -71,9 +71,7 @@ export async function getAdvisorPlanSnapshot(): Promise<AdvisorPlanSnapshot> {
     monthlyFreeCashflowOverrideCents:
       facts.biweeklyNetPayCents > 0
         ? null
-        : facts.averageMonthlyIncomeCents -
-          facts.monthlyFixedExpenseCents -
-          facts.averageMonthlySpendingCents
+        : facts.averageMonthlyFreeCashflowCents
   });
 
   const retirementMissingFields: string[] = [];
@@ -92,17 +90,21 @@ export async function getAdvisorPlanSnapshot(): Promise<AdvisorPlanSnapshot> {
     const recommendation = recommendBiweeklyRetirementContribution({
       biweeklyNetPayCents: facts.biweeklyNetPayCents,
       fixedMonthlyExpenseCents: facts.monthlyFixedExpenseCents,
-      averageVariableMonthlyExpenseCents: facts.averageMonthlySpendingCents,
+      averageVariableMonthlyExpenseCents:
+        facts.averageMonthlySpendingCents + facts.averageMonthlyInvestingCents,
       existingRetirementContributionBps: 0,
       targetSavingsBufferCents: Math.min(
         emergencyFund.shortfallCents,
-        Math.max(Math.round(facts.averageMonthlyNetCashflowCents * 0.3), 0)
+        Math.max(Math.round(facts.averageMonthlyFreeCashflowCents * 0.3), 0)
       )
     });
     recommendedBiweeklyContribution = centsToDollarsString(
       recommendation.recommendedBiweeklyRetirementContributionCents
     );
     retirementAssumptions.push(...recommendation.reasoning);
+    retirementAssumptions.push(
+      "Observed investing transfers are treated as already-committed outflows before new retirement increases are suggested."
+    );
   }
 
   return {

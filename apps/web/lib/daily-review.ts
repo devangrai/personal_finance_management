@@ -4,6 +4,7 @@ import {
   prisma
 } from "@portfolio/db";
 import { autoCategorizeTransactions } from "./ai-categorization";
+import { toCanonicalDateKey } from "./date-utils";
 import { getAppEnv } from "./env";
 import { getOrCreateDefaultUser } from "./user";
 
@@ -60,7 +61,10 @@ function getLocalHour(date: Date, timeZone: string) {
   );
 }
 
-async function listTransactionsForLocalDate(userId: string, localDateKey: string, timeZone: string) {
+async function listTransactionsForLocalDate(
+  userId: string,
+  localDateKey: string
+) {
   const recentTransactions = await prisma.transaction.findMany({
     where: {
       userId,
@@ -85,7 +89,7 @@ async function listTransactionsForLocalDate(userId: string, localDateKey: string
   });
 
   return recentTransactions.filter(
-    (transaction) => formatLocalDateKey(transaction.date, timeZone) === localDateKey
+    (transaction) => toCanonicalDateKey(transaction.date) === localDateKey
   );
 }
 
@@ -299,8 +303,7 @@ export async function runDailyReviewCycle(
 
   const todaysTransactionsBefore = await listTransactionsForLocalDate(
     user.id,
-    localDateKey,
-    env.dailyReviewTimezone
+    localDateKey
   );
   const uncategorizedIds = todaysTransactionsBefore
     .filter(
@@ -318,8 +321,7 @@ export async function runDailyReviewCycle(
 
   const todaysTransactionsAfter = await listTransactionsForLocalDate(
     user.id,
-    localDateKey,
-    env.dailyReviewTimezone
+    localDateKey
   );
 
   const autoCategorizedCount = todaysTransactionsAfter.filter(

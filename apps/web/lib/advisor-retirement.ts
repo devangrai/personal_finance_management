@@ -10,7 +10,7 @@ type RetirementRecommendationPayload = {
   inputs: {
     biweeklyNetPay: string | null;
     monthlyFixedExpense: string;
-    averageVariableMonthlyExpense: string;
+    observedMonthlyOutflows: string;
     emergencyFundTarget: string;
     housingStatus: string;
   };
@@ -33,7 +33,10 @@ export async function getRetirementContributionRecommendation(): Promise<Retirem
     inputs: {
       biweeklyNetPay: plan.facts.biweeklyNetPay,
       monthlyFixedExpense: plan.facts.monthlyFixedExpense,
-      averageVariableMonthlyExpense: plan.facts.averageMonthlySpending,
+      observedMonthlyOutflows: (
+        Number(plan.facts.averageMonthlySpending) +
+        Number(plan.facts.averageMonthlyInvesting)
+      ).toFixed(2),
       emergencyFundTarget: plan.facts.emergencyFundTarget,
       housingStatus: plan.facts.housingStatus
     },

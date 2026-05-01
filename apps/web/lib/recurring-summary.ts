@@ -12,6 +12,7 @@ type FrequencyProfile = {
 type RecurringGroupTransaction = {
   amount: number;
   categoryLabel: string | null;
+  topLevelCategoryKey: string | null;
   date: Date;
   direction: "credit" | "debit";
   displayName: string;
@@ -104,7 +105,13 @@ function getNextExpectedDate(lastDate: Date, cadenceDays: number) {
     .slice(0, 10);
 }
 
-export async function getRecurringSummary() {
+type GetRecurringSummaryOptions = {
+  includeTransferLike?: boolean;
+};
+
+export async function getRecurringSummary(
+  options: GetRecurringSummaryOptions = {}
+) {
   const userId = await getDefaultUserId();
   const startDate = new Date();
   startDate.setUTCDate(startDate.getUTCDate() - 180);
@@ -132,7 +139,9 @@ export async function getRecurringSummary() {
       reviewStatus: true,
       category: {
         select: {
-          label: true
+          key: true,
+          label: true,
+          parentKey: true
         }
       }
     }
@@ -147,6 +156,8 @@ export async function getRecurringSummary() {
     bucket.push({
       amount: Number(transaction.amount),
       categoryLabel: transaction.category?.label ?? null,
+      topLevelCategoryKey:
+        transaction.category?.parentKey ?? transaction.category?.key ?? null,
       date: transaction.date,
       direction: transaction.direction,
       displayName,
@@ -192,6 +203,17 @@ export async function getRecurringSummary() {
       }
 
       const latest = orderedGroup[orderedGroup.length - 1];
+      const latestCategorizedTransaction = [...orderedGroup]
+        .reverse()
+        .find((transaction) => transaction.topLevelCategoryKey !== null);
+      const topLevelCategoryKey =
+        latestCategorizedTransaction?.topLevelCategoryKey ?? null;
+      const isTransferLike =
+        topLevelCategoryKey === "transfer" || topLevelCategoryKey === "investing";
+
+      if (isTransferLike && !options.includeTransferLike) {
+        return null;
+      }
 
       return {
         averageAmount: averageAmount.toFixed(2),
