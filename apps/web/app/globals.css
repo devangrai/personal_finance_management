@@ -215,6 +215,15 @@ body {
   margin-top: 1.5rem;
 }
 
+.advisorInsights,
+.advisorScenarioNotes {
+  margin-top: 1rem;
+}
+
+.advisorScenarioPanel {
+  margin-top: 1rem;
+}
+
 .transactionsBlock {
   margin-top: 1.5rem;
 }

@@ -278,6 +278,55 @@ type RetirementRecommendationResponse = {
   missingFields: string[];
 };
 
+type AdvisorPlanResponse = {
+  facts: {
+    averageMonthlyIncome: string;
+    averageMonthlySpending: string;
+    averageMonthlyInvesting: string;
+    averageMonthlyNetCashflow: string;
+    averageMonthlyFreeCashflow: string;
+    averageMonthlyRecurringIncome: string;
+    averageMonthlyRecurringOutflows: string;
+    reviewedSpendCoveragePercent: string;
+    liquidCashBalance: string;
+    emergencyFundTarget: string;
+    emergencyFundRunwayMonths: string;
+    housingStatus: UserProfileSnapshot["housingStatus"];
+    biweeklyNetPay: string | null;
+    monthlyFixedExpense: string;
+  };
+  emergencyFund: {
+    currentLiquidSavings: string;
+    targetAmount: string;
+    runwayMonths: string;
+    shortfallAmount: string;
+    targetMonths: number;
+    reasoning: string[];
+  };
+  retirement: {
+    recommendedBiweeklyContribution: string | null;
+    targetSavingsRatePercent: string | null;
+    reasoning: string[];
+    assumptions: string[];
+    missingFields: string[];
+  };
+  paycheckAllocation: {
+    availableBiweeklySurplus: string;
+    monthlyFreeCashflow: string;
+    scenarios: Array<{
+      key: "conservative" | "balanced" | "aggressive";
+      label: string;
+      biweeklyAmounts: {
+        retirement: string;
+        emergencyFund: string;
+        taxableInvesting: string;
+        reserve: string;
+      };
+      reasoning: string[];
+    }>;
+  };
+};
+
 const plaidSetupSteps = [
   "Create a free Plaid developer account and open the Dashboard.",
   "Copy your Sandbox client_id and secret into the app .env file.",
@@ -452,6 +501,7 @@ export function PlaidConnectionPanel() {
   const [profile, setProfile] = useState<UserProfileSnapshot | null>(null);
   const [retirementRecommendation, setRetirementRecommendation] =
     useState<RetirementRecommendationResponse | null>(null);
+  const [advisorPlan, setAdvisorPlan] = useState<AdvisorPlanResponse | null>(null);
   const [profileForm, setProfileForm] = useState({
     housingStatus: "rent_free" as UserProfileSnapshot["housingStatus"],
     biweeklyNetPay: "",
@@ -473,6 +523,7 @@ export function PlaidConnectionPanel() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [retirementRecommendationError, setRetirementRecommendationError] =
     useState<string | null>(null);
+  const [advisorPlanError, setAdvisorPlanError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [linkSession, setLinkSession] = useState<StoredPlaidLinkSession | null>(null);
@@ -485,6 +536,7 @@ export function PlaidConnectionPanel() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isLoadingRetirementRecommendation, setIsLoadingRetirementRecommendation] =
     useState(true);
+  const [isLoadingAdvisorPlan, setIsLoadingAdvisorPlan] = useState(true);
   const [isCreatingLinkToken, setIsCreatingLinkToken] = useState(false);
   const [isSyncingTransactions, setIsSyncingTransactions] = useState(false);
   const [isAutoCategorizing, setIsAutoCategorizing] = useState(false);
@@ -762,6 +814,32 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  async function refreshAdvisorPlan() {
+    setIsLoadingAdvisorPlan(true);
+    setAdvisorPlanError(null);
+
+    try {
+      const response = await fetch("/api/advisor/plan", {
+        method: "GET"
+      });
+      const payload = (await response.json()) as AdvisorPlanResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to load the advisor plan.");
+      }
+
+      setAdvisorPlan(payload);
+    } catch (error) {
+      setAdvisorPlanError(
+        error instanceof Error ? error.message : "Unable to load the advisor plan."
+      );
+    } finally {
+      setIsLoadingAdvisorPlan(false);
+    }
+  }
+
   useEffect(() => {
     void refreshAccounts();
     void refreshCategories();
@@ -771,6 +849,7 @@ export function PlaidConnectionPanel() {
     void refreshSuggestedRules();
     void refreshProfile();
     void refreshRetirementRecommendation();
+    void refreshAdvisorPlan();
   }, []);
 
   useEffect(() => {
@@ -851,6 +930,7 @@ export function PlaidConnectionPanel() {
     await refreshTransactions();
     await refreshCashflowSummary();
     await refreshRetirementRecommendation();
+    await refreshAdvisorPlan();
     await refreshRecurringSummary();
     await refreshDailyReviewDigest();
     await refreshSuggestedRules();
@@ -946,6 +1026,7 @@ export function PlaidConnectionPanel() {
       await Promise.all([refreshAccounts(), refreshTransactions()]);
       await refreshCashflowSummary();
       await refreshRetirementRecommendation();
+      await refreshAdvisorPlan();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       const failureSuffix =
@@ -989,6 +1070,7 @@ export function PlaidConnectionPanel() {
       await refreshTransactions();
       await refreshCashflowSummary();
       await refreshRetirementRecommendation();
+      await refreshAdvisorPlan();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       await refreshSuggestedRules();
@@ -1040,6 +1122,7 @@ export function PlaidConnectionPanel() {
       );
       await refreshCashflowSummary();
       await refreshRetirementRecommendation();
+      await refreshAdvisorPlan();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       await refreshSuggestedRules();
@@ -1085,6 +1168,7 @@ export function PlaidConnectionPanel() {
       await refreshTransactions();
       await refreshCashflowSummary();
       await refreshRetirementRecommendation();
+      await refreshAdvisorPlan();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       await refreshSuggestedRules();
@@ -1133,6 +1217,7 @@ export function PlaidConnectionPanel() {
       await refreshTransactions();
       await refreshCashflowSummary();
       await refreshRetirementRecommendation();
+      await refreshAdvisorPlan();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       await refreshSuggestedRules();
@@ -1176,6 +1261,7 @@ export function PlaidConnectionPanel() {
       await refreshTransactions();
       await refreshCashflowSummary();
       await refreshRetirementRecommendation();
+      await refreshAdvisorPlan();
       await refreshRecurringSummary();
       await refreshDailyReviewDigest();
       await refreshSuggestedRules();
@@ -1257,6 +1343,7 @@ export function PlaidConnectionPanel() {
 
       setProfile(payload.profile);
       await refreshRetirementRecommendation();
+      await refreshAdvisorPlan();
       setStatusMessage("Advisor profile saved.");
     } catch (error) {
       setStatusMessage(
@@ -1607,16 +1694,20 @@ export function PlaidConnectionPanel() {
             <h3>Advisor groundwork</h3>
             <p className="panelCopy">
               Save a few personal context inputs and the app can turn reviewed
-              cash flow into an explainable retirement contribution suggestion.
+              cash flow into a facts layer, emergency-fund view, and scenario-based
+              paycheck allocation guidance.
             </p>
           </div>
           <button
             className="secondaryButton"
-            disabled={isLoadingRetirementRecommendation}
-            onClick={() => void refreshRetirementRecommendation()}
+            disabled={isLoadingRetirementRecommendation || isLoadingAdvisorPlan}
+            onClick={async () => {
+              await refreshRetirementRecommendation();
+              await refreshAdvisorPlan();
+            }}
             type="button"
           >
-            Refresh recommendation
+            Refresh advisor
           </button>
         </div>
 
@@ -1794,6 +1885,132 @@ export function PlaidConnectionPanel() {
             )}
           </article>
         </div>
+
+        <div className="grid gridWide advisorInsights">
+          <article className="card">
+            <h3>Advisor facts</h3>
+            {isLoadingAdvisorPlan ? (
+              <p className="panelCopy">Loading advisor facts...</p>
+            ) : advisorPlanError ? (
+              <p className="errorLine">{advisorPlanError}</p>
+            ) : !advisorPlan ? (
+              <p className="panelCopy">Advisor facts are not available yet.</p>
+            ) : (
+              <ul className="list tightList">
+                <li>
+                  Average monthly income:{" "}
+                  {formatCurrency(advisorPlan.facts.averageMonthlyIncome)}
+                </li>
+                <li>
+                  Average monthly spending:{" "}
+                  {formatCurrency(advisorPlan.facts.averageMonthlySpending)}
+                </li>
+                <li>
+                  Monthly free cash flow:{" "}
+                  {formatCurrency(advisorPlan.facts.averageMonthlyFreeCashflow)}
+                </li>
+                <li>
+                  Liquid cash balance:{" "}
+                  {formatCurrency(advisorPlan.facts.liquidCashBalance)}
+                </li>
+                <li>
+                  Reviewed spend coverage:{" "}
+                  {advisorPlan.facts.reviewedSpendCoveragePercent}%
+                </li>
+              </ul>
+            )}
+          </article>
+
+          <article className="card">
+            <h3>Emergency fund</h3>
+            {isLoadingAdvisorPlan ? (
+              <p className="panelCopy">Loading emergency-fund guidance...</p>
+            ) : advisorPlanError ? (
+              <p className="errorLine">{advisorPlanError}</p>
+            ) : !advisorPlan ? (
+              <p className="panelCopy">Emergency-fund guidance is unavailable.</p>
+            ) : (
+              <>
+                <p className="summaryValue">
+                  {advisorPlan.emergencyFund.runwayMonths} months
+                </p>
+                <p className="summaryMeta">
+                  Current runway against a {advisorPlan.emergencyFund.targetMonths}-month target
+                </p>
+                <ul className="list tightList">
+                  <li>
+                    Cash on hand:{" "}
+                    {formatCurrency(advisorPlan.emergencyFund.currentLiquidSavings)}
+                  </li>
+                  <li>
+                    Target fund: {formatCurrency(advisorPlan.emergencyFund.targetAmount)}
+                  </li>
+                  <li>
+                    Shortfall: {formatCurrency(advisorPlan.emergencyFund.shortfallAmount)}
+                  </li>
+                </ul>
+              </>
+            )}
+          </article>
+        </div>
+
+        <article className="panel advisorScenarioPanel">
+          <h3>Paycheck allocation scenarios</h3>
+          {isLoadingAdvisorPlan ? (
+            <p className="panelCopy">Building paycheck allocation scenarios...</p>
+          ) : advisorPlanError ? (
+            <p className="errorLine">{advisorPlanError}</p>
+          ) : !advisorPlan ? (
+            <p className="panelCopy">Scenario planning is unavailable.</p>
+          ) : (
+            <>
+              <p className="panelCopy">
+                Available biweekly surplus:{" "}
+                {formatCurrency(advisorPlan.paycheckAllocation.availableBiweeklySurplus)}.
+                Monthly free cash flow basis:{" "}
+                {formatCurrency(advisorPlan.paycheckAllocation.monthlyFreeCashflow)}.
+              </p>
+              <div className="tableWrap compactTableWrap">
+                <table className="summaryTable">
+                  <thead>
+                    <tr>
+                      <th>Scenario</th>
+                      <th>Retirement</th>
+                      <th>Emergency fund</th>
+                      <th>Taxable investing</th>
+                      <th>Reserve</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {advisorPlan.paycheckAllocation.scenarios.map((scenario) => (
+                      <tr key={scenario.key}>
+                        <td>{scenario.label}</td>
+                        <td>{formatCurrency(scenario.biweeklyAmounts.retirement)}</td>
+                        <td>{formatCurrency(scenario.biweeklyAmounts.emergencyFund)}</td>
+                        <td>
+                          {formatCurrency(scenario.biweeklyAmounts.taxableInvesting)}
+                        </td>
+                        <td>{formatCurrency(scenario.biweeklyAmounts.reserve)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="grid gridWide advisorScenarioNotes">
+                {advisorPlan.paycheckAllocation.scenarios.map((scenario) => (
+                  <article key={scenario.key} className="summaryCard">
+                    <p className="summaryLabel">{scenario.label}</p>
+                    <ul className="list tightList">
+                      {scenario.reasoning.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </article>
+                ))}
+              </div>
+            </>
+          )}
+        </article>
       </div>
 
       <div className="recurringBlock">
