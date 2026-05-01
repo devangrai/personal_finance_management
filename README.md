@@ -133,6 +133,20 @@ Recommended workflow:
 6. Preview the import before committing it.
 7. Import it and refresh the investments summary.
 
+Batch pipeline:
+
+1. Copy the Fidelity exports into `imports/fidelity/`.
+2. Create a local manifest from [fidelity-import-manifest.example.json](/Users/devrai/Downloads/personal_finance_management/imports/fidelity/fidelity-import-manifest.example.json).
+3. Fill in one entry per file with the account name, subtype, bucket, and import kind.
+4. Run `npm run fidelity:import:preview` to validate every CSV in one pass.
+5. Run `npm run fidelity:import:commit` to import every valid file.
+
+Notes:
+
+- The local manifest file is ignored by git, so account-specific filenames and metadata stay local.
+- The batch importer currently supports both Fidelity brokerage-style exports and the alternate 401(k) / workplace activity CSV shape.
+- The current RSU page does not expose the same `Activity & Orders -> Download as CSV` flow, so that plan is not covered by this pipeline yet.
+
 ## AI review loop
 
 The current app can run an LLM review pass over uncategorized transactions and store:

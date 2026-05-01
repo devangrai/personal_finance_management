@@ -141,8 +141,8 @@ const TRANSACTION_HEADER_ALIASES = {
   subtype: ["sub type", "subtype"],
   symbol: ["symbol", "ticker"],
   securityId: ["cusip", "security id"],
-  name: ["description", "details", "security description", "investment name", "name"],
-  quantity: ["quantity", "shares"],
+  name: ["description", "details", "security description", "investment name", "investment", "name"],
+  quantity: ["quantity", "shares", "shares/unit", "shares units"],
   price: ["price", "share price"],
   fees: ["fees", "fee", "commission"],
   amount: ["amount", "net amount", "value", "transaction amount"]
@@ -164,22 +164,24 @@ function normalizeHeader(value: string) {
     .toLowerCase()
     .replace(/[%$]/g, "")
     .replace(/[_/()-]+/g, " ")
-    .replace(/\s+/g, " ");
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizeCell(value: string) {
-  return value.trim();
+  return value.replace(/\uFEFF/g, "").trim();
 }
 
 function parseCsv(content: string): ParsedCsvTable {
+  const sanitizedContent = content.replace(/^\uFEFF/u, "");
   const rows: string[][] = [];
   let currentCell = "";
   let currentRow: string[] = [];
   let inQuotes = false;
 
-  for (let index = 0; index < content.length; index += 1) {
-    const character = content[index] ?? "";
-    const nextCharacter = content[index + 1] ?? "";
+  for (let index = 0; index < sanitizedContent.length; index += 1) {
+    const character = sanitizedContent[index] ?? "";
+    const nextCharacter = sanitizedContent[index + 1] ?? "";
 
     if (character === "\"") {
       if (inQuotes && nextCharacter === "\"") {
@@ -392,50 +394,56 @@ function parseTransactionsCsv(
   const warnings: string[] = [];
 
   for (const row of table.rows) {
-    const rawRow = toRawRow(table.headers, row);
-    const date = parseDateValue(readCell(row, dateIndex), "transaction date");
-    const type = readCell(row, typeIndex) || "activity";
-    const name = readCell(row, nameIndex) || type;
-    const subtype = readCell(row, subtypeIndex) || null;
-    const symbol = readCell(row, symbolIndex) || null;
-    const securityId = readCell(row, securityIdIndex) || null;
-    const amount = parseDecimalString(readCell(row, amountIndex));
-    const quantity = parseQuantityString(readCell(row, quantityIndex));
-    const price = parseQuantityString(readCell(row, priceIndex));
-    const fees = parseDecimalString(readCell(row, feesIndex));
+    try {
+      const rawRow = toRawRow(table.headers, row);
+      const date = parseDateValue(readCell(row, dateIndex), "transaction date");
+      const type = readCell(row, typeIndex) || "activity";
+      const name = readCell(row, nameIndex) || type;
+      const subtype = readCell(row, subtypeIndex) || null;
+      const symbol = readCell(row, symbolIndex) || null;
+      const securityId = readCell(row, securityIdIndex) || null;
+      const amount = parseDecimalString(readCell(row, amountIndex));
+      const quantity = parseQuantityString(readCell(row, quantityIndex));
+      const price = parseQuantityString(readCell(row, priceIndex));
+      const fees = parseDecimalString(readCell(row, feesIndex));
 
-    if (!amount) {
-      warnings.push(`Skipped line ${row.lineNumber}: missing amount.`);
-      continue;
-    }
+      if (!amount) {
+        warnings.push(`Skipped line ${row.lineNumber}: missing amount.`);
+        continue;
+      }
 
-    parsedRows.push({
-      rowFingerprint: createRowFingerprint([
-        metadata.accountName,
-        metadata.accountSubtype,
-        date.toISOString(),
+      parsedRows.push({
+        rowFingerprint: createRowFingerprint([
+          metadata.accountName,
+          metadata.accountSubtype,
+          date.toISOString(),
+          type,
+          subtype,
+          symbol,
+          name,
+          amount,
+          quantity,
+          price,
+          fees
+        ]),
+        date,
+        name,
         type,
         subtype,
         symbol,
-        name,
+        securityId,
         amount,
         quantity,
         price,
-        fees
-      ]),
-      date,
-      name,
-      type,
-      subtype,
-      symbol,
-      securityId,
-      amount,
-      quantity,
-      price,
-      fees,
-      isoCurrencyCode: metadata.isoCurrencyCode,
-      rawRow
-    });
+        fees,
+        isoCurrencyCode: metadata.isoCurrencyCode,
+        rawRow
+      });
+    } catch (error) {
+      warnings.push(
+        `Skipped line ${row.lineNumber}: ${error instanceof Error ? error.message : "invalid transaction row"}.`
+      );
+    }
   }
 
   if (parsedRows.length === 0) {
@@ -484,44 +492,50 @@ function parseHoldingsCsv(
   const warnings: string[] = [];
 
   for (const row of table.rows) {
-    const rawRow = toRawRow(table.headers, row);
-    const securityName = readCell(row, securityNameIndex);
-    const symbol = readCell(row, symbolIndex) || null;
-    const securityId = readCell(row, securityIdIndex) || null;
-    const quantity = parseQuantityString(readCell(row, quantityIndex));
-    const institutionPrice = parseQuantityString(readCell(row, priceIndex));
-    const institutionValue = parseDecimalString(readCell(row, institutionValueIndex));
-    const costBasis = parseDecimalString(readCell(row, costBasisIndex));
+    try {
+      const rawRow = toRawRow(table.headers, row);
+      const securityName = readCell(row, securityNameIndex);
+      const symbol = readCell(row, symbolIndex) || null;
+      const securityId = readCell(row, securityIdIndex) || null;
+      const quantity = parseQuantityString(readCell(row, quantityIndex));
+      const institutionPrice = parseQuantityString(readCell(row, priceIndex));
+      const institutionValue = parseDecimalString(readCell(row, institutionValueIndex));
+      const costBasis = parseDecimalString(readCell(row, costBasisIndex));
 
-    if (!securityName || !institutionValue) {
-      warnings.push(
-        `Skipped line ${row.lineNumber}: missing security name or current value.`
-      );
-      continue;
-    }
+      if (!securityName || !institutionValue) {
+        warnings.push(
+          `Skipped line ${row.lineNumber}: missing security name or current value.`
+        );
+        continue;
+      }
 
-    parsedRows.push({
-      rowFingerprint: createRowFingerprint([
-        metadata.accountName,
-        metadata.accountSubtype,
-        snapshotDate.toISOString(),
-        symbol,
+      parsedRows.push({
+        rowFingerprint: createRowFingerprint([
+          metadata.accountName,
+          metadata.accountSubtype,
+          snapshotDate.toISOString(),
+          symbol,
+          securityName,
+          institutionValue,
+          quantity,
+          institutionPrice
+        ]),
+        asOf: snapshotDate,
         securityName,
-        institutionValue,
+        symbol,
+        securityId,
         quantity,
-        institutionPrice
-      ]),
-      asOf: snapshotDate,
-      securityName,
-      symbol,
-      securityId,
-      quantity,
-      institutionPrice,
-      institutionValue,
-      costBasis,
-      isoCurrencyCode: metadata.isoCurrencyCode,
-      rawRow
-    });
+        institutionPrice,
+        institutionValue,
+        costBasis,
+        isoCurrencyCode: metadata.isoCurrencyCode,
+        rawRow
+      });
+    } catch (error) {
+      warnings.push(
+        `Skipped line ${row.lineNumber}: ${error instanceof Error ? error.message : "invalid holding row"}.`
+      );
+    }
   }
 
   if (parsedRows.length === 0) {

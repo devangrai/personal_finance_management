@@ -13,3 +13,8 @@ coverage
 .env.production.local
 prisma/dev.db
 .vercel
+imports/fidelity/*.csv
+!imports/fidelity/fidelity-holdings-template.csv
+!imports/fidelity/fidelity-transactions-template.csv
+imports/fidelity/*.json
+!imports/fidelity/fidelity-import-manifest.example.json
