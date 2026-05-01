@@ -67,7 +67,13 @@ export async function getAdvisorPlanSnapshot(): Promise<AdvisorPlanSnapshot> {
     averageVariableMonthlyExpenseCents: facts.averageMonthlySpendingCents,
     biweeklyNetPayCents: facts.biweeklyNetPayCents,
     emergencyFundShortfallCents: emergencyFund.shortfallCents,
-    fixedMonthlyExpenseCents: facts.monthlyFixedExpenseCents
+    fixedMonthlyExpenseCents: facts.monthlyFixedExpenseCents,
+    monthlyFreeCashflowOverrideCents:
+      facts.biweeklyNetPayCents > 0
+        ? null
+        : facts.averageMonthlyIncomeCents -
+          facts.monthlyFixedExpenseCents -
+          facts.averageMonthlySpendingCents
   });
 
   const retirementMissingFields: string[] = [];
@@ -79,6 +85,9 @@ export async function getAdvisorPlanSnapshot(): Promise<AdvisorPlanSnapshot> {
 
   if (facts.biweeklyNetPayCents <= 0) {
     retirementMissingFields.push("biweekly net pay");
+    retirementAssumptions.push(
+      "Paycheck allocation scenarios fall back to observed monthly free cash flow when biweekly net pay is missing."
+    );
   } else {
     const recommendation = recommendBiweeklyRetirementContribution({
       biweeklyNetPayCents: facts.biweeklyNetPayCents,

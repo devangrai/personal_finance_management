@@ -41,6 +41,7 @@ export type PaycheckAllocationScenarioInput = {
   biweeklyNetPayCents: number;
   emergencyFundShortfallCents: number;
   fixedMonthlyExpenseCents: number;
+  monthlyFreeCashflowOverrideCents?: number | null;
 };
 
 export type PaycheckAllocationScenario = {
@@ -142,9 +143,11 @@ export function buildPaycheckAllocationPlan(
   input: PaycheckAllocationScenarioInput
 ): PaycheckAllocationPlan {
   const monthlyFreeCashflowCents =
-    Math.round((input.biweeklyNetPayCents * 26) / 12) -
-    input.fixedMonthlyExpenseCents -
-    input.averageVariableMonthlyExpenseCents;
+    input.monthlyFreeCashflowOverrideCents != null
+      ? input.monthlyFreeCashflowOverrideCents
+      : Math.round((input.biweeklyNetPayCents * 26) / 12) -
+        input.fixedMonthlyExpenseCents -
+        input.averageVariableMonthlyExpenseCents;
   const availableBiweeklySurplusCents = Math.max(
     monthlyToBiweeklyCents(monthlyFreeCashflowCents),
     0
