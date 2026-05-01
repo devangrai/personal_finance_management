@@ -2,7 +2,12 @@ import { getAdvisorPlanSnapshot } from "./advisor-plan";
 
 type RetirementRecommendationPayload = {
   recommendation: {
-    recommendedBiweeklyContribution: string;
+    recommendedBiweeklyContribution: string | null;
+    currentObservedBiweeklyContribution: string | null;
+    deltaFromObservedContribution: string | null;
+    observedTakeHomeRetirementRatePercent: string | null;
+    status: "below_target" | "on_track" | "aggressive" | "insufficient_data";
+    statusHeadline: string;
     reasoning: string[];
     assumptions: string[];
     targetSavingsRatePercent: string | null;
@@ -21,15 +26,21 @@ export async function getRetirementContributionRecommendation(): Promise<Retirem
   const plan = await getAdvisorPlanSnapshot();
 
   return {
-    recommendation: plan.retirement.recommendedBiweeklyContribution
-      ? {
-          recommendedBiweeklyContribution:
-            plan.retirement.recommendedBiweeklyContribution,
-          reasoning: plan.retirement.reasoning,
-          assumptions: plan.retirement.assumptions,
-          targetSavingsRatePercent: plan.retirement.targetSavingsRatePercent
-        }
-      : null,
+    recommendation: {
+      recommendedBiweeklyContribution:
+        plan.retirement.recommendedBiweeklyContribution,
+      currentObservedBiweeklyContribution:
+        plan.retirement.currentObservedBiweeklyContribution,
+      deltaFromObservedContribution:
+        plan.retirement.deltaFromObservedContribution,
+      observedTakeHomeRetirementRatePercent:
+        plan.retirement.observedTakeHomeRetirementRatePercent,
+      status: plan.retirement.status,
+      statusHeadline: plan.retirement.statusHeadline,
+      reasoning: plan.retirement.reasoning,
+      assumptions: plan.retirement.assumptions,
+      targetSavingsRatePercent: plan.retirement.targetSavingsRatePercent
+    },
     inputs: {
       biweeklyNetPay: plan.facts.biweeklyNetPay,
       monthlyFixedExpense: plan.facts.monthlyFixedExpense,

@@ -264,7 +264,12 @@ type UserProfileResponse = {
 
 type RetirementRecommendationResponse = {
   recommendation: {
-    recommendedBiweeklyContribution: string;
+    recommendedBiweeklyContribution: string | null;
+    currentObservedBiweeklyContribution: string | null;
+    deltaFromObservedContribution: string | null;
+    observedTakeHomeRetirementRatePercent: string | null;
+    status: "below_target" | "on_track" | "aggressive" | "insufficient_data";
+    statusHeadline: string;
     reasoning: string[];
     assumptions: string[];
     targetSavingsRatePercent: string | null;
@@ -306,10 +311,43 @@ type AdvisorPlanResponse = {
   };
   retirement: {
     recommendedBiweeklyContribution: string | null;
+    currentObservedBiweeklyContribution: string | null;
+    deltaFromObservedContribution: string | null;
+    observedTakeHomeRetirementRatePercent: string | null;
     targetSavingsRatePercent: string | null;
+    status: "below_target" | "on_track" | "aggressive" | "insufficient_data";
+    statusHeadline: string;
     reasoning: string[];
     assumptions: string[];
     missingFields: string[];
+  };
+  paycheckFlow: {
+    takeHomeBaselineBiweekly: string | null;
+    takeHomeSource: "transactions" | "profile" | "unknown";
+    currentBiweeklyRetirementContribution: string;
+    currentBiweeklyTraditional401kContribution: string;
+    currentBiweeklyRoth401kContribution: string;
+    currentBiweeklyTaxableBrokerageDeposit: string;
+    currentBiweeklyRothIraContribution: string;
+    currentBiweeklyHsaEmployeeContribution: string;
+    currentBiweeklyHsaEmployerContribution: string;
+    percentOfTakeHomeToRetirement: string | null;
+    percentOfTakeHomeToTraditional401k: string | null;
+    percentOfTakeHomeToRoth401k: string | null;
+    percentOfTakeHomeToTaxableBrokerage: string | null;
+    recentPayPeriods: Array<{
+      anchorDate: string;
+      takeHomePay: string | null;
+      totalRetirementContribution: string;
+      traditional401kContribution: string;
+      roth401kContribution: string;
+      taxableBrokerageDeposit: string;
+      rothIraContribution: string;
+      hsaEmployeeContribution: string;
+      hsaEmployerContribution: string;
+      matchedBy: "paycheck" | "investment_flow";
+    }>;
+    notes: string[];
   };
   paycheckAllocation: {
     availableBiweeklySurplus: string;
@@ -574,6 +612,21 @@ function formatInvestmentBucket(value: "retirement" | "taxable" | "other") {
 
 function formatInvestmentSource(value: "plaid" | "manual") {
   return value === "manual" ? "Manual import" : "Plaid";
+}
+
+function formatRetirementStatus(
+  value: "below_target" | "on_track" | "aggressive" | "insufficient_data"
+) {
+  switch (value) {
+    case "below_target":
+      return "Below target";
+    case "on_track":
+      return "On track";
+    case "aggressive":
+      return "Aggressive";
+    default:
+      return "Needs context";
+  }
 }
 
 function PlaidLinkLauncher({
@@ -2576,16 +2629,59 @@ export function PlaidConnectionPanel() {
               </p>
             ) : retirementRecommendation.recommendation ? (
               <>
-                <p className="summaryValue">
-                  {formatCurrency(
-                    retirementRecommendation.recommendation
-                      .recommendedBiweeklyContribution
+                {retirementRecommendation.recommendation
+                  .recommendedBiweeklyContribution ? (
+                  <>
+                    <p className="summaryValue">
+                      {formatCurrency(
+                        retirementRecommendation.recommendation
+                          .recommendedBiweeklyContribution
+                      )}
+                    </p>
+                    <p className="summaryMeta">
+                      Recommended per paycheck based on reviewed spending and your
+                      saved profile.
+                    </p>
+                  </>
+                ) : (
+                  <p className="panelCopy">
+                    A fully modeled target still needs one or more profile inputs,
+                    but the imported retirement flows are already available below.
+                  </p>
+                )}
+                <p className="metaLine">
+                  Observed status:{" "}
+                  {formatRetirementStatus(
+                    retirementRecommendation.recommendation.status
                   )}
                 </p>
-                <p className="summaryMeta">
-                  Recommended per paycheck based on reviewed spending and your
-                  saved profile.
+                <p className="panelCopy">
+                  {retirementRecommendation.recommendation.statusHeadline}
                 </p>
+                {retirementRecommendation.recommendation
+                  .currentObservedBiweeklyContribution ? (
+                  <p className="metaLine">
+                    Current observed retirement flow:{" "}
+                    {formatCurrency(
+                      retirementRecommendation.recommendation
+                        .currentObservedBiweeklyContribution
+                    )}
+                    {retirementRecommendation.recommendation
+                      .observedTakeHomeRetirementRatePercent
+                      ? ` · ${retirementRecommendation.recommendation.observedTakeHomeRetirementRatePercent}% of take-home baseline`
+                      : ""}
+                  </p>
+                ) : null}
+                {retirementRecommendation.recommendation
+                  .deltaFromObservedContribution ? (
+                  <p className="metaLine">
+                    Gap vs modeled target:{" "}
+                    {formatCurrency(
+                      retirementRecommendation.recommendation
+                        .deltaFromObservedContribution
+                    )}
+                  </p>
+                ) : null}
                 <ul className="list tightList">
                   {retirementRecommendation.recommendation.reasoning.map((item) => (
                     <li key={item}>{item}</li>
@@ -2609,6 +2705,16 @@ export function PlaidConnectionPanel() {
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
+                {retirementRecommendation.missingFields.length > 0 ? (
+                  <>
+                    <p className="metaLine">Still needed for a stronger target:</p>
+                    <ul className="list tightList">
+                      {retirementRecommendation.missingFields.map((field) => (
+                        <li key={field}>{field}</li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
               </>
             ) : (
               <>
@@ -2748,6 +2854,122 @@ export function PlaidConnectionPanel() {
                   </article>
                 ))}
               </div>
+            </>
+          )}
+        </article>
+
+        <article className="panel advisorScenarioPanel">
+          <h3>Observed paycheck-to-account flow</h3>
+          {isLoadingAdvisorPlan ? (
+            <p className="panelCopy">Mapping paycheck flows into Fidelity accounts...</p>
+          ) : advisorPlanError ? (
+            <p className="errorLine">{advisorPlanError}</p>
+          ) : !advisorPlan ? (
+            <p className="panelCopy">Observed paycheck flow is unavailable.</p>
+          ) : (
+            <>
+              <p className="panelCopy">
+                This view uses imported Fidelity transactions plus paycheck detections
+                from your banking ledger to show where money is landing each cycle.
+              </p>
+              <div className="summaryGrid">
+                <article className="summaryCard">
+                  <p className="summaryLabel">Take-home baseline</p>
+                  <p className="summaryValue">
+                    {advisorPlan.paycheckFlow.takeHomeBaselineBiweekly
+                      ? formatCurrency(advisorPlan.paycheckFlow.takeHomeBaselineBiweekly)
+                      : "—"}
+                  </p>
+                  <p className="summaryMeta">
+                    Source: {advisorPlan.paycheckFlow.takeHomeSource}
+                  </p>
+                </article>
+                <article className="summaryCard">
+                  <p className="summaryLabel">401(k) per pay cycle</p>
+                  <p className="summaryValue">
+                    {formatCurrency(
+                      advisorPlan.paycheckFlow.currentBiweeklyRetirementContribution
+                    )}
+                  </p>
+                  <p className="summaryMeta">
+                    {advisorPlan.paycheckFlow.percentOfTakeHomeToRetirement
+                      ? `${advisorPlan.paycheckFlow.percentOfTakeHomeToRetirement}% of take-home baseline`
+                      : "Take-home baseline not available yet"}
+                  </p>
+                </article>
+                <article className="summaryCard">
+                  <p className="summaryLabel">BrokerageLink Roth</p>
+                  <p className="summaryValue">
+                    {formatCurrency(
+                      advisorPlan.paycheckFlow.currentBiweeklyRoth401kContribution
+                    )}
+                  </p>
+                  <p className="summaryMeta">
+                    {advisorPlan.paycheckFlow.percentOfTakeHomeToRoth401k
+                      ? `${advisorPlan.paycheckFlow.percentOfTakeHomeToRoth401k}% of take-home baseline`
+                      : "Waiting on paycheck baseline"}
+                  </p>
+                </article>
+                <article className="summaryCard">
+                  <p className="summaryLabel">Individual brokerage</p>
+                  <p className="summaryValue">
+                    {formatCurrency(
+                      advisorPlan.paycheckFlow.currentBiweeklyTaxableBrokerageDeposit
+                    )}
+                  </p>
+                  <p className="summaryMeta">
+                    {advisorPlan.paycheckFlow.percentOfTakeHomeToTaxableBrokerage
+                      ? `${advisorPlan.paycheckFlow.percentOfTakeHomeToTaxableBrokerage}% of take-home baseline`
+                      : "Waiting on paycheck baseline"}
+                  </p>
+                </article>
+              </div>
+
+              <div className="tableWrap compactTableWrap">
+                <table className="summaryTable">
+                  <thead>
+                    <tr>
+                      <th>Cycle</th>
+                      <th>Take-home</th>
+                      <th>401(k) total</th>
+                      <th>Pre-tax 401(k)</th>
+                      <th>Roth 401(k)</th>
+                      <th>Taxable brokerage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {advisorPlan.paycheckFlow.recentPayPeriods.map((period) => (
+                      <tr key={period.anchorDate}>
+                        <td>
+                          {formatCalendarDate(period.anchorDate)}
+                          <div className="summaryMeta">{period.matchedBy}</div>
+                        </td>
+                        <td>
+                          {period.takeHomePay
+                            ? formatCurrency(period.takeHomePay)
+                            : "—"}
+                        </td>
+                        <td>
+                          {formatCurrency(period.totalRetirementContribution)}
+                        </td>
+                        <td>
+                          {formatCurrency(period.traditional401kContribution)}
+                        </td>
+                        <td>{formatCurrency(period.roth401kContribution)}</td>
+                        <td>
+                          {formatCurrency(period.taxableBrokerageDeposit)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <ul className="list tightList">
+                {advisorPlan.paycheckFlow.notes.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
             </>
           )}
         </article>

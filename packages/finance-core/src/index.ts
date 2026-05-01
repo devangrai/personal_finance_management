@@ -62,6 +62,21 @@ export type PaycheckAllocationPlan = {
   scenarios: PaycheckAllocationScenario[];
 };
 
+export type ObservedRetirementPositionInput = {
+  currentBiweeklyRetirementContributionCents: number;
+  targetBiweeklyRetirementContributionCents?: number | null;
+  takeHomeBaselineBiweeklyCents?: number | null;
+  targetRetirementSavingsRatePercent?: number | null;
+  emergencyFundShortfallCents: number;
+};
+
+export type ObservedRetirementPosition = {
+  status: "below_target" | "on_track" | "aggressive" | "insufficient_data";
+  headline: string;
+  reasoning: string[];
+  currentTakeHomeSavingsRateBps: number | null;
+};
+
 export function recommendBiweeklyRetirementContribution(
   input: ContributionRecommendationInput
 ): ContributionRecommendation {
@@ -231,5 +246,132 @@ export function buildPaycheckAllocationPlan(
     availableBiweeklySurplusCents,
     monthlyFreeCashflowCents,
     scenarios
+  };
+}
+
+export function assessObservedRetirementPosition(
+  input: ObservedRetirementPositionInput
+): ObservedRetirementPosition {
+  const currentTakeHomeSavingsRateBps =
+    input.takeHomeBaselineBiweeklyCents && input.takeHomeBaselineBiweeklyCents > 0
+      ? Math.round(
+          (input.currentBiweeklyRetirementContributionCents /
+            input.takeHomeBaselineBiweeklyCents) *
+            10000
+        )
+      : null;
+  const targetRateBps =
+    input.targetRetirementSavingsRatePercent != null &&
+    Number.isFinite(input.targetRetirementSavingsRatePercent)
+      ? Math.round(input.targetRetirementSavingsRatePercent * 100)
+      : null;
+
+  if (input.currentBiweeklyRetirementContributionCents <= 0) {
+    return {
+      status: "below_target",
+      headline: "No recurring retirement contribution flow has been detected yet.",
+      reasoning: [
+        "The imported investment data does not show a positive recurring retirement contribution in the recent pay cycles."
+      ],
+      currentTakeHomeSavingsRateBps
+    };
+  }
+
+  if (
+    input.targetBiweeklyRetirementContributionCents != null &&
+    input.targetBiweeklyRetirementContributionCents > 0
+  ) {
+    const ratio =
+      input.currentBiweeklyRetirementContributionCents /
+      input.targetBiweeklyRetirementContributionCents;
+
+    if (
+      ratio > 1.2 &&
+      input.emergencyFundShortfallCents > 0
+    ) {
+      return {
+        status: "aggressive",
+        headline:
+          "Current retirement contributions are running above the modeled target while cash-buffer work remains.",
+        reasoning: [
+          "Observed retirement contributions are more than 20% above the modeled target.",
+          "That can still be intentional, but it is aggressive while the emergency fund is below target."
+        ],
+        currentTakeHomeSavingsRateBps
+      };
+    }
+
+    if (ratio < 0.85) {
+      return {
+        status: "below_target",
+        headline:
+          "Current retirement contributions are below the modeled paycheck target.",
+        reasoning: [
+          "Observed retirement contributions are more than 15% below the modeled target.",
+          "Increasing the contribution gradually would move the observed flow closer to the plan."
+        ],
+        currentTakeHomeSavingsRateBps
+      };
+    }
+
+    return {
+      status: "on_track",
+      headline:
+        "Current retirement contributions are broadly in line with the modeled paycheck target.",
+      reasoning: [
+        "Observed retirement contributions are within a reasonable band of the modeled target."
+      ],
+      currentTakeHomeSavingsRateBps
+    };
+  }
+
+  if (targetRateBps != null && currentTakeHomeSavingsRateBps != null) {
+    if (currentTakeHomeSavingsRateBps < Math.round(targetRateBps * 0.85)) {
+      return {
+        status: "below_target",
+        headline:
+          "Observed retirement contributions are below the saved savings-rate target.",
+        reasoning: [
+          "The current observed retirement flow is below 85% of the target take-home savings rate."
+        ],
+        currentTakeHomeSavingsRateBps
+      };
+    }
+
+    if (
+      currentTakeHomeSavingsRateBps > Math.round(targetRateBps * 1.25) &&
+      input.emergencyFundShortfallCents > 0
+    ) {
+      return {
+        status: "aggressive",
+        headline:
+          "Observed retirement contributions are above the saved savings-rate target while liquidity is still catching up.",
+        reasoning: [
+          "The current observed retirement flow is more than 25% above the target take-home savings rate.",
+          "That suggests the contribution pace is aggressive relative to the cash-buffer goal."
+        ],
+        currentTakeHomeSavingsRateBps
+      };
+    }
+
+    return {
+      status: "on_track",
+      headline:
+        "Observed retirement contributions are reasonably aligned with the saved savings-rate target.",
+      reasoning: [
+        "The current observed retirement flow is close to the target take-home savings rate."
+      ],
+      currentTakeHomeSavingsRateBps
+    };
+  }
+
+  return {
+    status: "insufficient_data",
+    headline:
+      "Observed retirement contributions are available, but there is not enough profile context to grade them yet.",
+    reasoning: [
+      "Add a target retirement savings rate or keep using the modeled paycheck target to make this assessment sharper."
+    ],
+    currentTakeHomeSavingsRateBps
   };
 }
