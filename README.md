@@ -94,6 +94,45 @@ The frontend currently supports:
 
 The current implementation assumes a single bootstrap user derived from `DEFAULT_USER_EMAIL`. That keeps Item and account persistence deterministic until application auth is added.
 
+## Manual Fidelity import fallback
+
+If Plaid Investments is enabled but Fidelity still returns `Connectivity not supported`, the app now has a manual CSV import path in the `Investments groundwork` section.
+
+What it supports today:
+
+- Fidelity transaction-history CSV imports
+- Fidelity holdings snapshot CSV imports
+- manual account metadata so you can tag the import as `retirement`, `taxable`, or `other`
+- deduped re-imports for transactions
+- same-day holdings replacement for a clean current snapshot
+- merged display in the same investments summary cards, holdings list, and recent investment transactions table
+
+Recommended local folder for exports:
+
+- `/Users/devrai/Downloads/personal_finance_management/imports/fidelity/`
+
+Included starter templates:
+
+- [fidelity-transactions-template.csv](/Users/devrai/Downloads/personal_finance_management/imports/fidelity/fidelity-transactions-template.csv)
+- [fidelity-holdings-template.csv](/Users/devrai/Downloads/personal_finance_management/imports/fidelity/fidelity-holdings-template.csv)
+
+Suggested mapping for your current Fidelity accounts:
+
+- `Individual Brokerage Account` -> `Taxable`
+- `Roth IRA` -> `Retirement`
+- `401(k)` -> `Retirement`
+- `BrokerageLink 401(k)` -> `Retirement`
+
+Recommended workflow:
+
+1. Export a Fidelity CSV.
+2. Save it in `imports/fidelity/`.
+3. Open the app and go to `Investments groundwork`.
+4. Choose `Transactions CSV` or `Holdings snapshot CSV`.
+5. Fill in the account name, subtype, and bucket.
+6. Preview the import before committing it.
+7. Import it and refresh the investments summary.
+
 ## AI review loop
 
 The current app can run an LLM review pass over uncategorized transactions and store:

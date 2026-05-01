@@ -70,6 +70,15 @@ export const DailyReviewDigestStatus = {
 export type DailyReviewDigestStatus =
   (typeof DailyReviewDigestStatus)[keyof typeof DailyReviewDigestStatus];
 
+export const ManualInvestmentBucket = {
+  retirement: "retirement",
+  taxable: "taxable",
+  other: "other"
+} as const;
+
+export type ManualInvestmentBucket =
+  (typeof ManualInvestmentBucket)[keyof typeof ManualInvestmentBucket];
+
 declare global {
   // eslint-disable-next-line no-var
   var __portfolioPrisma__: PrismaClient | undefined;

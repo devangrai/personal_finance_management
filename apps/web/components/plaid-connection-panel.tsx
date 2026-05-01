@@ -349,6 +349,7 @@ type InvestmentsSummaryResponse = {
     bucket: "retirement" | "taxable" | "other";
     holdingCount: number;
     lastHoldingsAsOf: string | null;
+    source: "plaid" | "manual";
   }>;
   topHoldings: Array<{
     accountId: string;
@@ -359,6 +360,7 @@ type InvestmentsSummaryResponse = {
     institutionValue: string;
     quantity: string | null;
     asOf: string;
+    source: "plaid" | "manual";
   }>;
   recentTransactions: Array<{
     id: string;
@@ -373,7 +375,68 @@ type InvestmentsSummaryResponse = {
     accountName: string;
     accountSubtype: string | null;
     institutionName: string | null;
+    source: "plaid" | "manual";
   }>;
+};
+
+type ManualInvestmentImportPreviewResponse =
+  | {
+      fileName: string;
+      importKind: "transactions";
+      accountName: string;
+      accountSubtype: string | null;
+      bucket: "retirement" | "taxable" | "other";
+      isoCurrencyCode: string;
+      rowCount: number;
+      previewRows: Array<{
+        date: string;
+        name: string;
+        type: string;
+        subtype: string | null;
+        symbol: string | null;
+        amount: string;
+        quantity: string | null;
+        price: string | null;
+        fees: string | null;
+      }>;
+      detectedColumns: string[];
+      warnings: string[];
+    }
+  | {
+      fileName: string;
+      importKind: "holdings";
+      accountName: string;
+      accountSubtype: string | null;
+      bucket: "retirement" | "taxable" | "other";
+      isoCurrencyCode: string;
+      rowCount: number;
+      asOf: string;
+      previewRows: Array<{
+        asOf: string;
+        securityName: string;
+        symbol: string | null;
+        quantity: string | null;
+        institutionPrice: string | null;
+        institutionValue: string;
+        costBasis: string | null;
+      }>;
+      detectedColumns: string[];
+      warnings: string[];
+    };
+
+type ManualInvestmentImportCommitResponse = {
+  importKind: "transactions" | "holdings";
+  account: {
+    id: string;
+    name: string;
+    subtype: string | null;
+    bucket: "retirement" | "taxable" | "other";
+    source: string;
+  };
+  rowCount: number;
+  importedCount: number;
+  duplicateCount: number;
+  warnings: string[];
 };
 
 const plaidSetupSteps = [
@@ -509,6 +572,10 @@ function formatInvestmentBucket(value: "retirement" | "taxable" | "other") {
   }
 }
 
+function formatInvestmentSource(value: "plaid" | "manual") {
+  return value === "manual" ? "Manual import" : "Plaid";
+}
+
 function PlaidLinkLauncher({
   linkToken,
   linkSession,
@@ -564,6 +631,8 @@ export function PlaidConnectionPanel() {
   const [advisorPlan, setAdvisorPlan] = useState<AdvisorPlanResponse | null>(null);
   const [investmentsSummary, setInvestmentsSummary] =
     useState<InvestmentsSummaryResponse | null>(null);
+  const [manualImportPreview, setManualImportPreview] =
+    useState<ManualInvestmentImportPreviewResponse | null>(null);
   const [profileForm, setProfileForm] = useState({
     housingStatus: "rent_free" as UserProfileSnapshot["housingStatus"],
     biweeklyNetPay: "",
@@ -587,6 +656,7 @@ export function PlaidConnectionPanel() {
     useState<string | null>(null);
   const [advisorPlanError, setAdvisorPlanError] = useState<string | null>(null);
   const [investmentsError, setInvestmentsError] = useState<string | null>(null);
+  const [manualImportError, setManualImportError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [linkSession, setLinkSession] = useState<StoredPlaidLinkSession | null>(null);
@@ -604,6 +674,9 @@ export function PlaidConnectionPanel() {
   const [isCreatingLinkToken, setIsCreatingLinkToken] = useState(false);
   const [isSyncingTransactions, setIsSyncingTransactions] = useState(false);
   const [isSyncingInvestments, setIsSyncingInvestments] = useState(false);
+  const [isPreviewingManualImport, setIsPreviewingManualImport] = useState(false);
+  const [isImportingManualInvestments, setIsImportingManualInvestments] =
+    useState(false);
   const [isAutoCategorizing, setIsAutoCategorizing] = useState(false);
   const [isRunningDailyReview, setIsRunningDailyReview] = useState(false);
   const [isApplyingSuggestedRules, setIsApplyingSuggestedRules] = useState(false);
@@ -618,6 +691,15 @@ export function PlaidConnectionPanel() {
   const [pendingOpen, setPendingOpen] = useState(false);
   const [isLinkReady, setIsLinkReady] = useState(false);
   const [linkLauncherKey, setLinkLauncherKey] = useState(0);
+  const [manualImportForm, setManualImportForm] = useState({
+    importKind: "transactions" as "transactions" | "holdings",
+    accountName: "",
+    accountSubtype: "",
+    bucket: "retirement" as "retirement" | "taxable" | "other",
+    isoCurrencyCode: "USD",
+    asOfDate: new Date().toISOString().slice(0, 10)
+  });
+  const [manualImportFile, setManualImportFile] = useState<File | null>(null);
   const reviewDate = searchParams.get("reviewDate");
   const transactionLimit = reviewDate ? 100 : 25;
 
@@ -931,6 +1013,98 @@ export function PlaidConnectionPanel() {
     }
   }
 
+  function buildManualImportFormData() {
+    if (!manualImportFile) {
+      throw new Error("Choose a Fidelity CSV file before continuing.");
+    }
+
+    const formData = new FormData();
+    formData.set("file", manualImportFile);
+    formData.set("importKind", manualImportForm.importKind);
+    formData.set("accountName", manualImportForm.accountName);
+    formData.set("accountSubtype", manualImportForm.accountSubtype);
+    formData.set("bucket", manualImportForm.bucket);
+    formData.set("isoCurrencyCode", manualImportForm.isoCurrencyCode || "USD");
+    formData.set("asOfDate", manualImportForm.asOfDate);
+    formData.set("source", "fidelity_csv");
+    return formData;
+  }
+
+  async function handlePreviewManualImport() {
+    setIsPreviewingManualImport(true);
+    setManualImportError(null);
+
+    try {
+      const response = await fetch("/api/investments/import/preview", {
+        method: "POST",
+        body: buildManualImportFormData()
+      });
+      const payload = (await response.json()) as unknown;
+
+      if (!response.ok) {
+        const errorMessage =
+          typeof payload === "object" &&
+          payload &&
+          "error" in payload &&
+          typeof payload.error === "string"
+            ? payload.error
+            : "Unable to preview the Fidelity import.";
+        throw new Error(errorMessage);
+      }
+
+      setManualImportPreview(payload as ManualInvestmentImportPreviewResponse);
+      setStatusMessage("Manual Fidelity import preview is ready.");
+    } catch (error) {
+      setManualImportError(
+        error instanceof Error
+          ? error.message
+          : "Unable to preview the Fidelity import."
+      );
+      setManualImportPreview(null);
+    } finally {
+      setIsPreviewingManualImport(false);
+    }
+  }
+
+  async function handleCommitManualImport() {
+    setIsImportingManualInvestments(true);
+    setManualImportError(null);
+
+    try {
+      const response = await fetch("/api/investments/import/commit", {
+        method: "POST",
+        body: buildManualImportFormData()
+      });
+      const payload = (await response.json()) as unknown;
+
+      if (!response.ok) {
+        const errorMessage =
+          typeof payload === "object" &&
+          payload &&
+          "error" in payload &&
+          typeof payload.error === "string"
+            ? payload.error
+            : "Unable to import the Fidelity CSV.";
+        throw new Error(errorMessage);
+      }
+
+      const successPayload = payload as ManualInvestmentImportCommitResponse;
+      setStatusMessage(
+        `Imported ${successPayload.importedCount} ${successPayload.importKind} row(s) into ${successPayload.account.name}.`
+      );
+      setManualImportPreview(null);
+      await Promise.all([refreshInvestmentsSummary(), refreshAdvisorPlan()]);
+    } catch (error) {
+      setManualImportError(
+        error instanceof Error
+          ? error.message
+          : "Unable to import the Fidelity CSV."
+      );
+    } finally {
+      setIsImportingManualInvestments(false);
+    }
+  }
+
   useEffect(() => {
     void refreshAccounts();
     void refreshCategories();
@@ -947,6 +1121,19 @@ export function PlaidConnectionPanel() {
   useEffect(() => {
     void refreshTransactions();
   }, [reviewDate]);
+
+  useEffect(() => {
+    setManualImportPreview(null);
+    setManualImportError(null);
+  }, [
+    manualImportFile,
+    manualImportForm.accountName,
+    manualImportForm.accountSubtype,
+    manualImportForm.asOfDate,
+    manualImportForm.bucket,
+    manualImportForm.importKind,
+    manualImportForm.isoCurrencyCode
+  ]);
 
   const linkedItems = useMemo(() => {
     const items = new Map<string, PlaidItemSummary>();
@@ -1839,6 +2026,8 @@ export function PlaidConnectionPanel() {
               This is the bridge to Fidelity. Once Plaid Investments is enabled
               and a brokerage or retirement institution is linked, the app can
               sync holdings and investment transactions into the same ledger.
+              If Fidelity still blocks Plaid connectivity, use the manual CSV
+              importer below and the imported data will flow into this same summary.
             </p>
           </div>
           <div className="buttonRow">
@@ -1868,6 +2057,237 @@ export function PlaidConnectionPanel() {
             </button>
           </div>
         </div>
+
+        <article className="card">
+          <h3>Manual Fidelity CSV import</h3>
+          <p className="panelCopy">
+            This is the fallback lane for Fidelity if Plaid connectivity stays blocked.
+            Export a CSV from Fidelity, save it somewhere easy like
+            <code> /Users/devrai/Downloads/personal_finance_management/imports/fidelity/</code>,
+            then upload it here. We support transaction-history imports now and holdings
+            snapshots as a second step.
+          </p>
+
+          <div className="profileGrid">
+            <label className="fieldLabel">
+              Import type
+              <select
+                className="fieldInput"
+                onChange={(event) => {
+                  const nextKind = event.target.value === "holdings" ? "holdings" : "transactions";
+                  setManualImportForm((current) => ({
+                    ...current,
+                    importKind: nextKind
+                  }));
+                }}
+                value={manualImportForm.importKind}
+              >
+                <option value="transactions">Transactions CSV</option>
+                <option value="holdings">Holdings snapshot CSV</option>
+              </select>
+            </label>
+
+            <label className="fieldLabel">
+              Account name
+              <input
+                className="fieldInput"
+                onChange={(event) => {
+                  setManualImportForm((current) => ({
+                    ...current,
+                    accountName: event.target.value
+                  }));
+                }}
+                placeholder="Fidelity Roth IRA"
+                type="text"
+                value={manualImportForm.accountName}
+              />
+            </label>
+
+            <label className="fieldLabel">
+              Account subtype
+              <input
+                className="fieldInput"
+                onChange={(event) => {
+                  setManualImportForm((current) => ({
+                    ...current,
+                    accountSubtype: event.target.value
+                  }));
+                }}
+                placeholder="Roth IRA, 401(k), Brokerage, BrokerageLink 401(k)"
+                type="text"
+                value={manualImportForm.accountSubtype}
+              />
+            </label>
+
+            <label className="fieldLabel">
+              Bucket
+              <select
+                className="fieldInput"
+                onChange={(event) => {
+                  const nextBucket =
+                    event.target.value === "taxable"
+                      ? "taxable"
+                      : event.target.value === "other"
+                        ? "other"
+                        : "retirement";
+                  setManualImportForm((current) => ({
+                    ...current,
+                    bucket: nextBucket
+                  }));
+                }}
+                value={manualImportForm.bucket}
+              >
+                <option value="retirement">Retirement</option>
+                <option value="taxable">Taxable</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+
+            <label className="fieldLabel">
+              Currency
+              <input
+                className="fieldInput"
+                maxLength={3}
+                onChange={(event) => {
+                  setManualImportForm((current) => ({
+                    ...current,
+                    isoCurrencyCode: event.target.value.toUpperCase()
+                  }));
+                }}
+                type="text"
+                value={manualImportForm.isoCurrencyCode}
+              />
+            </label>
+
+            <label className="fieldLabel">
+              Holdings as-of date
+              <input
+                className="fieldInput"
+                disabled={manualImportForm.importKind !== "holdings"}
+                onChange={(event) => {
+                  setManualImportForm((current) => ({
+                    ...current,
+                    asOfDate: event.target.value
+                  }));
+                }}
+                type="date"
+                value={manualImportForm.asOfDate}
+              />
+            </label>
+
+            <label className="fieldLabel">
+              Fidelity CSV file
+              <input
+                accept=".csv,text/csv"
+                className="fieldInput"
+                onChange={(event) => {
+                  setManualImportFile(event.target.files?.[0] ?? null);
+                }}
+                type="file"
+              />
+            </label>
+          </div>
+
+          <div className="buttonRow">
+            <button
+              className="secondaryButton"
+              disabled={isPreviewingManualImport || isImportingManualInvestments}
+              onClick={() => void handlePreviewManualImport()}
+              type="button"
+            >
+              {isPreviewingManualImport ? "Previewing..." : "Preview Fidelity import"}
+            </button>
+            <button
+              className="secondaryButton"
+              disabled={
+                !manualImportPreview ||
+                isPreviewingManualImport ||
+                isImportingManualInvestments
+              }
+              onClick={() => void handleCommitManualImport()}
+              type="button"
+            >
+              {isImportingManualInvestments ? "Importing..." : "Import into portfolio"}
+            </button>
+          </div>
+
+          {manualImportError ? <p className="errorLine">{manualImportError}</p> : null}
+
+          {manualImportPreview ? (
+            <div className="stackGap">
+              <p className="panelCopy">
+                Previewing {manualImportPreview.rowCount} {manualImportPreview.importKind} row(s)
+                for {manualImportPreview.accountName}
+                {manualImportPreview.accountSubtype
+                  ? ` · ${manualImportPreview.accountSubtype}`
+                  : ""}{" "}
+                · {formatInvestmentBucket(manualImportPreview.bucket)}
+                {manualImportPreview.importKind === "holdings"
+                  ? ` · as of ${formatCalendarDate(manualImportPreview.asOf)}`
+                  : ""}
+              </p>
+
+              {manualImportPreview.warnings.length > 0 ? (
+                <ul className="list tightList">
+                  {manualImportPreview.warnings.slice(0, 5).map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              ) : null}
+
+              <p className="summaryMeta">
+                Detected columns: {manualImportPreview.detectedColumns.join(", ")}
+              </p>
+
+              <div className="tableWrap compactTableWrap">
+                <table className="summaryTable">
+                  <thead>
+                    <tr>
+                      {manualImportPreview.importKind === "transactions" ? (
+                        <>
+                          <th>Date</th>
+                          <th>Description</th>
+                          <th>Type</th>
+                          <th>Amount</th>
+                        </>
+                      ) : (
+                        <>
+                          <th>Symbol</th>
+                          <th>Security</th>
+                          <th>Quantity</th>
+                          <th>Value</th>
+                        </>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {manualImportPreview.importKind === "transactions"
+                      ? manualImportPreview.previewRows.map((row) => (
+                          <tr key={`${row.date}-${row.name}-${row.amount}`}>
+                            <td>{formatCalendarDate(row.date)}</td>
+                            <td>
+                              {row.symbol ? `${row.symbol} · ${row.name}` : row.name}
+                            </td>
+                            <td>{row.subtype ?? row.type}</td>
+                            <td>{formatCurrency(row.amount)}</td>
+                          </tr>
+                        ))
+                      : manualImportPreview.previewRows.map((row) => (
+                          <tr
+                            key={`${row.asOf}-${row.symbol ?? row.securityName}-${row.institutionValue}`}
+                          >
+                            <td>{row.symbol ?? "—"}</td>
+                            <td>{row.securityName}</td>
+                            <td>{row.quantity ?? "—"}</td>
+                            <td>{formatCurrency(row.institutionValue)}</td>
+                          </tr>
+                        ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+        </article>
 
         {isLoadingInvestments ? (
           <p className="panelCopy">Loading investments summary...</p>
@@ -1929,6 +2349,8 @@ export function PlaidConnectionPanel() {
                     <li key={account.id}>
                       <strong>{account.institutionName ?? "Institution"} · {account.name}</strong>
                       {" · "}
+                      {formatInvestmentSource(account.source)}
+                      {" · "}
                       {formatInvestmentBucket(account.bucket)}
                       {" · "}
                       {formatCurrency(account.currentBalance)}
@@ -1952,6 +2374,8 @@ export function PlaidConnectionPanel() {
                         {formatCurrency(holding.institutionValue)}
                         {" · "}
                         {holding.accountName}
+                        {" · "}
+                        {formatInvestmentSource(holding.source)}
                       </li>
                     ))}
                   </ul>
@@ -1987,7 +2411,11 @@ export function PlaidConnectionPanel() {
                               : transaction.name}
                           </td>
                           <td>{transaction.accountName}</td>
-                          <td>{transaction.subtype ?? transaction.type}</td>
+                          <td>
+                            {transaction.subtype ?? transaction.type}
+                            {" · "}
+                            {formatInvestmentSource(transaction.source)}
+                          </td>
                           <td>{formatCurrency(transaction.amount)}</td>
                         </tr>
                       ))}
