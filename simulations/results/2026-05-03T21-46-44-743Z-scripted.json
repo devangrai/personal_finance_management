@@ -1,0 +1,741 @@
+[
+  {
+    "scenario": {
+      "id": "irs-401k-limit-lookup",
+      "description": "Simple IRS limit lookup. Should route to tax-planner at fast tier, call get_irs_limits, quote $24,000.",
+      "user_turns": [
+        "Quick one — what's the 401k contribution limit for this year?"
+      ],
+      "expected": {
+        "specialists": [
+          "tax-planner"
+        ],
+        "tier": [
+          "fast",
+          "mid"
+        ],
+        "required_tools_called": [
+          "get_irs_limits"
+        ],
+        "forbidden_tools_called": [
+          "save_user_fact",
+          "save_user_goal",
+          "update_profile"
+        ],
+        "answer_must_contain": [
+          "24"
+        ],
+        "answer_must_not_contain": [
+          "recommend you should",
+          "we should file"
+        ],
+        "max_tool_calls_total": 3
+      }
+    },
+    "ok": true,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": true
+      },
+      {
+        "name": "specialists_match",
+        "ok": true
+      },
+      {
+        "name": "tier_match",
+        "ok": true
+      },
+      {
+        "name": "required_tool:get_irs_limits",
+        "ok": true
+      },
+      {
+        "name": "forbidden_tool:save_user_fact",
+        "ok": true
+      },
+      {
+        "name": "forbidden_tool:save_user_goal",
+        "ok": true
+      },
+      {
+        "name": "forbidden_tool:update_profile",
+        "ok": true
+      },
+      {
+        "name": "answer_contains:24",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:recommend you should",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:we should file",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [
+      "tax-planner"
+    ],
+    "tier": "fast",
+    "toolsCalled": [
+      "get_irs_limits"
+    ],
+    "answer": "The IRS elective deferral limit for 401k, 403b, and 457 plans for 2024 is $23,000. For those aged 50 and over, there is an additional catch-up contribution limit of $7,500.",
+    "latencyMs": 5248,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "brokeragelink-contribution-search",
+      "description": "Search investment transactions for BrokerageLink activity. Either spending-coach or portfolio-analyst is a defensible pick - both will call search_transactions.",
+      "user_turns": [
+        "Can you pull up all my BrokerageLink transfers from the last three months?"
+      ],
+      "expected": {
+        "specialists": [
+          [
+            "spending-coach"
+          ],
+          [
+            "portfolio-analyst"
+          ]
+        ],
+        "tier": [
+          "fast",
+          "mid"
+        ],
+        "required_tools_called": [
+          "search_transactions"
+        ],
+        "forbidden_tools_called": [
+          "save_user_fact",
+          "save_user_goal"
+        ],
+        "max_tool_calls_total": 4
+      }
+    },
+    "ok": true,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": true
+      },
+      {
+        "name": "specialists_match",
+        "ok": true
+      },
+      {
+        "name": "tier_match",
+        "ok": true
+      },
+      {
+        "name": "required_tool:search_transactions",
+        "ok": true
+      },
+      {
+        "name": "forbidden_tool:save_user_fact",
+        "ok": true
+      },
+      {
+        "name": "forbidden_tool:save_user_goal",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [
+      "portfolio-analyst"
+    ],
+    "tier": "fast",
+    "toolsCalled": [
+      "search_transactions"
+    ],
+    "answer": "I found 4 BrokerageLink transfers from manual investments totaling $4,296.92 in the last three months.",
+    "latencyMs": 4616,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "goals-progress-checkin",
+      "description": "Check progress against saved goals. Should route to goal-tracker, call get_goals and get_goal_progress.",
+      "user_turns": [
+        "How am I doing on the goals I've saved?"
+      ],
+      "expected": {
+        "specialists": [
+          "goal-tracker"
+        ],
+        "tier": [
+          "fast",
+          "mid"
+        ],
+        "required_tools_called": [
+          "get_goals"
+        ],
+        "forbidden_tools_called": [
+          "save_user_goal",
+          "deactivate_goal"
+        ],
+        "answer_must_contain": [
+          "retirement"
+        ],
+        "max_tool_calls_total": 4
+      }
+    },
+    "ok": true,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": true
+      },
+      {
+        "name": "specialists_match",
+        "ok": true
+      },
+      {
+        "name": "tier_match",
+        "ok": true
+      },
+      {
+        "name": "required_tool:get_goals",
+        "ok": true
+      },
+      {
+        "name": "forbidden_tool:save_user_goal",
+        "ok": true
+      },
+      {
+        "name": "forbidden_tool:deactivate_goal",
+        "ok": true
+      },
+      {
+        "name": "answer_contains:retirement",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [
+      "goal-tracker"
+    ],
+    "tier": "fast",
+    "toolsCalled": [
+      "get_goals",
+      "get_goal_progress"
+    ],
+    "answer": "You have four goals: a Sabbatical Fund, an Emergency Fund, saving for a down payment, and a retirement savings rate goal. Currently, your Emergency Fund is at 0% completion and you are behind on this goal. For your Sabbatical Fund, there's not enough data to assess progress. Your down payment goal and retirement savings rate goal also lack sufficient data for automatic progress tracking.",
+    "latencyMs": 3334,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "new-emergency-fund-goal",
+      "description": "User commits to a new emergency fund goal. Must call save_user_goal and confirm back.",
+      "user_turns": [
+        "I want to commit to building up a $50,000 emergency fund by July 2027. Save that for me?"
+      ],
+      "expected": {
+        "specialists": [
+          "goal-tracker"
+        ],
+        "tier": [
+          "fast",
+          "mid"
+        ],
+        "required_tools_called": [
+          "save_user_goal"
+        ],
+        "answer_must_contain": [
+          "50,000"
+        ],
+        "max_tool_calls_total": 4
+      }
+    },
+    "ok": true,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": true
+      },
+      {
+        "name": "specialists_match",
+        "ok": true
+      },
+      {
+        "name": "tier_match",
+        "ok": true
+      },
+      {
+        "name": "required_tool:save_user_goal",
+        "ok": true
+      },
+      {
+        "name": "answer_contains:50,000",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [
+      "goal-tracker"
+    ],
+    "tier": "mid",
+    "toolsCalled": [
+      "save_user_goal"
+    ],
+    "answer": "Consider it saved! You're committed to building a $50,000 emergency fund by July 2027. I'll help you track your progress towards this goal.",
+    "latencyMs": 3014,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "retirement-pace-check",
+      "description": "Retirement pacing question. Should route to retirement-pacer, consult age/target-age facts and age-based target.",
+      "user_turns": [
+        "I'm 28 and aiming to retire at 60. Am I tracking well toward that?"
+      ],
+      "expected": {
+        "specialists": [
+          "retirement-pacer"
+        ],
+        "tier": [
+          "mid",
+          "deep"
+        ],
+        "required_tools_called": [
+          "get_advisor_plan"
+        ],
+        "forbidden_tools_called": [],
+        "max_tool_calls_total": 6
+      }
+    },
+    "ok": true,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": true
+      },
+      {
+        "name": "specialists_match",
+        "ok": true
+      },
+      {
+        "name": "tier_match",
+        "ok": true
+      },
+      {
+        "name": "required_tool:get_advisor_plan",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [
+      "retirement-pacer"
+    ],
+    "tier": "mid",
+    "toolsCalled": [
+      "get_user_facts",
+      "get_goals",
+      "get_advisor_plan",
+      "get_age_based_retirement_target"
+    ],
+    "answer": "At 28, Fidelity's guidance suggests aiming to have 1x your current salary saved for retirement by age 30, with a recommended savings rate of 15% of your gross income. Your current biweekly retirement contribution is $2108.08.",
+    "latencyMs": 5576,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "portfolio-allocation-overview",
+      "description": "Portfolio allocation snapshot. Should route to portfolio-analyst, call analyze_allocation.",
+      "user_turns": [
+        "Give me a breakdown of where my investments sit right now — retirement vs taxable, concentration, that kind of thing."
+      ],
+      "expected": {
+        "specialists": [
+          "portfolio-analyst"
+        ],
+        "tier": [
+          "mid",
+          "deep"
+        ],
+        "required_tools_called": [
+          "analyze_allocation"
+        ],
+        "answer_must_not_contain": [
+          "buy more of",
+          "i recommend selling"
+        ],
+        "max_tool_calls_total": 4
+      }
+    },
+    "ok": false,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": true
+      },
+      {
+        "name": "specialists_match",
+        "ok": true
+      },
+      {
+        "name": "tier_match",
+        "ok": false,
+        "detail": "expected mid|deep got fast"
+      },
+      {
+        "name": "required_tool:analyze_allocation",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:buy more of",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:i recommend selling",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [
+      "portfolio-analyst"
+    ],
+    "tier": "fast",
+    "toolsCalled": [
+      "analyze_allocation"
+    ],
+    "answer": "I cannot provide a breakdown of your investments as there are no holdings snapshots available. To enable a full allocation analysis, please import a Fidelity holdings CSV.",
+    "latencyMs": 2178,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "dining-spend-no-plaid-data",
+      "description": "Dining spend asked when Plaid transaction table is empty. Agent should honestly acknowledge missing data, not fabricate a number.",
+      "user_turns": [
+        "How much have I been spending on dining out lately?"
+      ],
+      "expected": {
+        "specialists": [
+          "spending-coach"
+        ],
+        "tier": [
+          "fast",
+          "mid"
+        ],
+        "required_tools_called": [],
+        "forbidden_tools_called": [
+          "save_user_fact"
+        ],
+        "answer_must_not_contain": [
+          "$"
+        ],
+        "max_tool_calls_total": 4
+      }
+    },
+    "ok": true,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": true
+      },
+      {
+        "name": "specialists_match",
+        "ok": true
+      },
+      {
+        "name": "tier_match",
+        "ok": true
+      },
+      {
+        "name": "forbidden_tool:save_user_fact",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:$",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [
+      "spending-coach"
+    ],
+    "tier": "fast",
+    "toolsCalled": [
+      "get_spending_trend"
+    ],
+    "answer": "I'm sorry, but I don't have enough data to show a trend for your dining out spending over the last 3 months. Would you like to see your spending for a specific month?",
+    "latencyMs": 6759,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "sabbatical-planning",
+      "description": "Open-ended planning question for a 3-month career pause. Should route to general-advisor at deep tier (cross-domain: savings, spending, goals, timing).",
+      "user_turns": [
+        "I'm thinking about taking a 3-month sabbatical next spring. What should I be thinking about financially to prepare?"
+      ],
+      "expected": {
+        "specialists": [
+          [
+            "general-advisor"
+          ],
+          [
+            "spending-coach",
+            "goal-tracker",
+            "retirement-pacer"
+          ],
+          [
+            "spending-coach",
+            "retirement-pacer"
+          ]
+        ],
+        "tier": [
+          "deep",
+          "mid"
+        ],
+        "forbidden_tools_called": [],
+        "answer_must_not_contain": [
+          "cannot advise",
+          "i'm just an ai"
+        ],
+        "min_bullets": 2,
+        "max_tool_calls_total": 8
+      }
+    },
+    "ok": false,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": true
+      },
+      {
+        "name": "specialists_match",
+        "ok": true
+      },
+      {
+        "name": "tier_match",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:cannot advise",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:i'm just an ai",
+        "ok": true
+      },
+      {
+        "name": "min_bullets",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": false,
+        "detail": "11 exceeds budget 8"
+      }
+    ],
+    "specialists": [
+      "spending-coach",
+      "goal-tracker",
+      "retirement-pacer"
+    ],
+    "tier": "deep",
+    "toolsCalled": [
+      "get_cashflow_summary",
+      "get_recurring",
+      "get_goals",
+      "get_user_facts",
+      "get_advisor_plan",
+      "get_investments_summary",
+      "get_irs_limits"
+    ],
+    "answer": "A sabbatical is a great goal! Planning for it financially comes down to three main things: replacing your lost income, covering your ongoing expenses, and funding any sabbatical-specific adventures, all while making sure you stay on track with your other long-term goals.",
+    "latencyMs": 47676,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "pause-401k-for-cash",
+      "description": "Classic multi-domain tradeoff: pause retirement contributions to build cash. Should route to multiple specialists, tier=deep, synthesized answer.",
+      "user_turns": [
+        "Would it be stupid for me to pause my 401k contributions for a few months to build up cash reserves?"
+      ],
+      "expected": {
+        "specialists": [
+          [
+            "retirement-pacer",
+            "goal-tracker"
+          ],
+          [
+            "retirement-pacer",
+            "spending-coach"
+          ],
+          [
+            "retirement-pacer",
+            "goal-tracker",
+            "spending-coach"
+          ]
+        ],
+        "tier": [
+          "deep",
+          "mid"
+        ],
+        "forbidden_tools_called": [],
+        "answer_must_not_contain": [
+          "you should pause",
+          "pause your 401k immediately"
+        ],
+        "min_bullets": 2,
+        "max_tool_calls_total": 10
+      }
+    },
+    "ok": true,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": true
+      },
+      {
+        "name": "specialists_match",
+        "ok": true
+      },
+      {
+        "name": "tier_match",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:you should pause",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:pause your 401k immediately",
+        "ok": true
+      },
+      {
+        "name": "min_bullets",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [
+      "retirement-pacer",
+      "spending-coach"
+    ],
+    "tier": "deep",
+    "toolsCalled": [
+      "get_advisor_plan",
+      "get_user_facts",
+      "get_goals",
+      "get_irs_limits",
+      "get_age_based_retirement_target",
+      "get_cashflow_summary"
+    ],
+    "answer": "That's a common question, and it's smart to think about your cash reserves. Pausing your 401(k) contributions is a direct trade-off: you get more cash in your pocket now, but you miss out on potential employer matching funds and tax-advantaged growth for retirement.",
+    "latencyMs": 47505,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "got-married-update-filing-status",
+      "description": "User volunteers a life change. Agent must save it - expect save_user_fact and/or update_profile.",
+      "user_turns": [
+        "Heads up — I got married last month and my wife and I will be filing jointly going forward."
+      ],
+      "expected": {
+        "specialists": [
+          [
+            "tax-planner",
+            "general-advisor"
+          ],
+          [
+            "tax-planner"
+          ],
+          [
+            "goal-tracker",
+            "tax-planner"
+          ],
+          [
+            "tax-planner",
+            "goal-tracker",
+            "general-advisor"
+          ]
+        ],
+        "tier": [
+          "mid",
+          "fast"
+        ],
+        "required_tools_called": [
+          "save_user_fact"
+        ],
+        "forbidden_tools_called": [],
+        "answer_must_contain": [
+          "marr"
+        ],
+        "max_tool_calls_total": 6
+      }
+    },
+    "ok": true,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": true
+      },
+      {
+        "name": "specialists_match",
+        "ok": true
+      },
+      {
+        "name": "tier_match",
+        "ok": true
+      },
+      {
+        "name": "required_tool:save_user_fact",
+        "ok": true
+      },
+      {
+        "name": "answer_contains:marr",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [
+      "goal-tracker",
+      "tax-planner"
+    ],
+    "tier": "mid",
+    "toolsCalled": [
+      "save_user_fact"
+    ],
+    "answer": "Congratulations on your marriage! Your filing status has been updated to 'married filing jointly' for future financial and tax observations.",
+    "latencyMs": 5946,
+    "error": null
+  }
+]

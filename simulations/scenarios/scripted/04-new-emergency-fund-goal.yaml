@@ -1,0 +1,10 @@
+id: "new-emergency-fund-goal"
+description: "User commits to a new emergency fund goal. Must call save_user_goal and confirm back."
+user_turns:
+  - "I want to commit to building up a $50,000 emergency fund by July 2027. Save that for me?"
+expected:
+  specialists: ["goal-tracker"]
+  tier: ["fast", "mid"]
+  required_tools_called: ["save_user_goal"]
+  answer_must_contain: ["50,000"]
+  max_tool_calls_total: 4

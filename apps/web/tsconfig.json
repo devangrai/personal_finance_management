@@ -1,0 +1,47 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "jsx": "preserve",
+    "paths": {
+      "@portfolio/db": [
+        "../../packages/db/src"
+      ],
+      "@portfolio/finance-core": [
+        "../../packages/finance-core/src"
+      ],
+      "@portfolio/plaid": [
+        "../../packages/plaid/src"
+      ],
+      "@portfolio/snaptrade": [
+        "../../packages/snaptrade/src"
+      ],
+      "@portfolio/ai": [
+        "../../packages/ai/src"
+      ],
+      "@/*": [
+        "./*"
+      ]
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "incremental": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

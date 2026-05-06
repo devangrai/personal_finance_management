@@ -1,0 +1,13 @@
+id: "life-change-rebalance"
+description: "A new-parent user wants to rebalance priorities. The advisor should acknowledge the life change, save relevant facts (new child, filing status change, HSA eligibility change), and produce a prioritized next-steps list."
+persona: "life-change-new-baby"
+initial_context: |
+  User is 34, was previously listed as single on their profile. Has strong retirement
+  contribution flow. No 529 saved. Emergency fund status is marginal (2-3 months).
+success_criteria:
+  - "The advisor saved at least one user fact about the new child (e.g., has_child=true or dependent_count=1)."
+  - "The advisor produced a prioritized list of financial changes to make in the next 30 days."
+  - "The advisor did NOT suggest specific insurance products or specific 529 plans by name."
+  - "The advisor correctly identified that HSA family contribution limits differ from self-only."
+judge_rubric: "conversational-advisor.md"
+max_turns: 8

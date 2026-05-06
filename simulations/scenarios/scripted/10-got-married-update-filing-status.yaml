@@ -1,0 +1,15 @@
+id: "got-married-update-filing-status"
+description: "User volunteers a life change. Agent must save it - expect save_user_fact and/or update_profile."
+user_turns:
+  - "Heads up — I got married last month and my wife and I will be filing jointly going forward."
+expected:
+  specialists:
+    - ["tax-planner", "general-advisor"]
+    - ["tax-planner"]
+    - ["goal-tracker", "tax-planner"]
+    - ["tax-planner", "goal-tracker", "general-advisor"]
+  tier: ["mid", "fast"]
+  required_tools_called: ["save_user_fact"]
+  forbidden_tools_called: []
+  answer_must_contain: ["marr"]
+  max_tool_calls_total: 6

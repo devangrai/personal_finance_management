@@ -1,0 +1,10 @@
+id: "retirement-pace-check"
+description: "Retirement pacing question. Should route to retirement-pacer, consult age/target-age facts and age-based target."
+user_turns:
+  - "I'm 28 and aiming to retire at 60. Am I tracking well toward that?"
+expected:
+  specialists: ["retirement-pacer"]
+  tier: ["mid", "deep"]
+  required_tools_called: ["get_advisor_plan"]
+  forbidden_tools_called: []
+  max_tool_calls_total: 6

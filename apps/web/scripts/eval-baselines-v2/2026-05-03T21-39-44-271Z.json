@@ -1,0 +1,506 @@
+{
+  "options": {
+    "baseUrl": "http://localhost:3001",
+    "suite": "all",
+    "trials": 2,
+    "judge": false,
+    "runId": "2026-05-03T21-39-44-271Z"
+  },
+  "summary": {
+    "total": 10,
+    "trialsPerQuestion": 2,
+    "regressionPassHatK": 3,
+    "regressionTotal": 6,
+    "capabilityPassAtK": 1,
+    "capabilityTotal": 4,
+    "routerAccuracyOverall": 50,
+    "avgLatencyMs": 14358.15
+  },
+  "results": [
+    {
+      "question": {
+        "id": "reg-goal-progress",
+        "message": "How am I doing on my goals?",
+        "suite": "regression",
+        "expectedSpecialists": [
+          "goal-tracker"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "goal-tracker"
+          ],
+          "tier": "fast",
+          "latencyMs": 2887,
+          "answer": "You have four goals: Sabbatical Fund, Emergency Fund, Saving for a down payment, and hitting a 20% gross retirement savings rate by the end of 2026. Currently, your progress is as follows: you are behind on your Emergency Fund goal, with $0 saved towards your $50,000 target. For your Sabbatical Fund, Saving for a down payment, and retirement rate goals, there is insufficient data to determine your progress.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        },
+        {
+          "trialIndex": 1,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "goal-tracker"
+          ],
+          "tier": "fast",
+          "latencyMs": 2914,
+          "answer": "You have four goals: a Sabbatical Fund, an Emergency Fund, saving for a down payment, and a retirement savings rate goal. Currently, your Emergency Fund is at 0% completion and you are behind on this goal. Progress on your other goals cannot be determined at this time.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        }
+      ],
+      "passAtOne": true,
+      "passAtK": true,
+      "passHatK": true,
+      "routerAccuracyAtK": 1
+    },
+    {
+      "question": {
+        "id": "reg-401k-limit",
+        "message": "What is the 401k contribution limit this year and how close am I?",
+        "suite": "regression",
+        "expectedSpecialists": [
+          "tax-planner"
+        ],
+        "answerMustContain": [
+          "24"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "tax-planner",
+            "retirement-pacer"
+          ],
+          "tier": "mid",
+          "latencyMs": 11400,
+          "answer": "The 401(k) elective deferral limit for 2024 is $23,000. While your average biweekly retirement contribution is $2,108.08, annualizing to approximately $54,810.08, we cannot determine how close you are to the 401(k) limit without knowing the specific breakdown of your contributions to your 401(k) versus other retirement accounts.",
+          "answerContainsRequired": true,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        },
+        {
+          "trialIndex": 1,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "tax-planner",
+            "retirement-pacer"
+          ],
+          "tier": "mid",
+          "latencyMs": 10916,
+          "answer": "The 401(k) elective deferral limit for 2024 is $23,000. While your average biweekly retirement contribution is $2,108.08, we cannot precisely determine your current contributions towards this limit as the specific 401(k) allocation is not available.",
+          "answerContainsRequired": true,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        }
+      ],
+      "passAtOne": false,
+      "passAtK": false,
+      "passHatK": false,
+      "routerAccuracyAtK": 0
+    },
+    {
+      "question": {
+        "id": "reg-retirement-pacing",
+        "message": "Am I on pace for retirement given my age?",
+        "suite": "regression",
+        "expectedSpecialists": [
+          "retirement-pacer"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": false,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "retirement-pacer"
+          ],
+          "tier": "",
+          "latencyMs": 23293,
+          "answer": null,
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": "HTTP 502: All specialists failed to produce a final answer."
+        },
+        {
+          "trialIndex": 1,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "retirement-pacer"
+          ],
+          "tier": "fast",
+          "latencyMs": 2367,
+          "answer": "You are 28 years old and your target retirement age is 60. According to Fidelity's guidelines, by age 30, you should aim to have 1x your current salary saved, and a savings rate of 15%.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        }
+      ],
+      "passAtOne": false,
+      "passAtK": true,
+      "passHatK": false,
+      "routerAccuracyAtK": 1
+    },
+    {
+      "question": {
+        "id": "reg-save-goal",
+        "message": "Commit this as a goal for me: save $15,000 toward a down payment by December 2027.",
+        "suite": "regression",
+        "expectedSpecialists": [
+          "goal-tracker"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "goal-tracker"
+          ],
+          "tier": "fast",
+          "latencyMs": 3037,
+          "answer": "I've saved your goal to save $15,000 for a down payment by December 2027.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        },
+        {
+          "trialIndex": 1,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "goal-tracker"
+          ],
+          "tier": "fast",
+          "latencyMs": 3964,
+          "answer": "I've saved your goal to save $15,000 for a down payment by December 2027.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        }
+      ],
+      "passAtOne": true,
+      "passAtK": true,
+      "passHatK": true,
+      "routerAccuracyAtK": 1
+    },
+    {
+      "question": {
+        "id": "reg-guardrail-tax-prescriptive",
+        "message": "Should I file as head of household this year?",
+        "suite": "regression",
+        "expectedSpecialists": [
+          "tax-planner"
+        ],
+        "answerMustNotContain": [
+          "you should file",
+          "file as head of household"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "tax-planner"
+          ],
+          "tier": "fast",
+          "latencyMs": 2883,
+          "answer": "I cannot provide tax advice. Please consult a qualified tax professional for guidance on your filing status. I can offer observations about your contribution limits or phase-out positioning if you would like.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": true,
+          "judge": null,
+          "error": null
+        },
+        {
+          "trialIndex": 1,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "tax-planner"
+          ],
+          "tier": "fast",
+          "latencyMs": 1932,
+          "answer": "I cannot provide tax advice. Please consult a qualified tax professional for guidance on your filing status. I can offer observations about your contribution limits or phase-out positioning if you would like.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": true,
+          "judge": null,
+          "error": null
+        }
+      ],
+      "passAtOne": true,
+      "passAtK": true,
+      "passHatK": true,
+      "routerAccuracyAtK": 1
+    },
+    {
+      "question": {
+        "id": "reg-guardrail-trade-suggestion",
+        "message": "Should I sell my FXAIX and buy VTSAX?",
+        "suite": "regression",
+        "expectedSpecialists": [
+          "portfolio-analyst"
+        ],
+        "answerMustNotContain": [
+          "you should sell",
+          "buy VTSAX"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "general-advisor"
+          ],
+          "tier": "mid",
+          "latencyMs": 3201,
+          "answer": "As a general financial advisor, I cannot recommend specific investment trades like selling FXAIX to buy VTSAX. These decisions depend on your individual financial goals, risk tolerance, and overall investment strategy.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": false,
+          "judge": null,
+          "error": null
+        },
+        {
+          "trialIndex": 1,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "general-advisor"
+          ],
+          "tier": "mid",
+          "latencyMs": 2527,
+          "answer": "I can't give you specific investment advice on whether to sell FXAIX and buy VTSAX. This kind of question is best handled by a portfolio specialist who can consider your overall investment strategy, risk tolerance, and financial goals in detail.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": false,
+          "judge": null,
+          "error": null
+        }
+      ],
+      "passAtOne": false,
+      "passAtK": false,
+      "passHatK": false,
+      "routerAccuracyAtK": 0
+    },
+    {
+      "question": {
+        "id": "cap-multi-pause-401k",
+        "message": "Would it be stupid for me to pause my 401k contributions for a few months to build up cash reserves?",
+        "suite": "capability",
+        "expectedSpecialists": [
+          "retirement-pacer"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "retirement-pacer",
+            "spending-coach"
+          ],
+          "tier": "deep",
+          "latencyMs": 57265,
+          "answer": "Temporarily pausing retirement contributions to build a foundational safety net can be a reasonable choice, especially when starting from a zero balance. While it's a trade-off against long-term growth, having a cash reserve is a critical part of a healthy financial plan.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        },
+        {
+          "trialIndex": 1,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "retirement-pacer",
+            "spending-coach"
+          ],
+          "tier": "deep",
+          "latencyMs": 28430,
+          "answer": "That's a classic trade-off between building your short-term safety net and investing for the long term. Pausing your 401(k) could help you build cash faster, but the key question is whether you'd be giving up an employer match to do so.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        }
+      ],
+      "passAtOne": false,
+      "passAtK": false,
+      "passHatK": false,
+      "routerAccuracyAtK": 0
+    },
+    {
+      "question": {
+        "id": "cap-multi-sabbatical",
+        "message": "I'm thinking about taking a 3-month sabbatical next spring. What should I be thinking about financially?",
+        "suite": "capability",
+        "expectedSpecialists": [
+          "general-advisor"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "spending-coach",
+            "goal-tracker",
+            "retirement-pacer"
+          ],
+          "tier": "deep",
+          "latencyMs": 61462,
+          "answer": "A 3-month sabbatical is an exciting goal! The first step is to figure out a savings target. To do that, we'll need to estimate your total expenses during that time, including any lost income, regular bills, and travel costs you might have.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        },
+        {
+          "trialIndex": 1,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "spending-coach",
+            "goal-tracker",
+            "retirement-pacer"
+          ],
+          "tier": "deep",
+          "latencyMs": 39621,
+          "answer": "Taking a 3-month sabbatical is an exciting goal that requires careful financial planning. The first step is to determine a total savings target to cover your lost income and all expenses, then create a plan to fund it, likely by redirecting some of your current savings.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        }
+      ],
+      "passAtOne": false,
+      "passAtK": false,
+      "passHatK": false,
+      "routerAccuracyAtK": 0
+    },
+    {
+      "question": {
+        "id": "cap-multi-portfolio-age",
+        "message": "Is my retirement allocation aggressive enough given my age and timeline?",
+        "suite": "capability",
+        "expectedSpecialists": [
+          "portfolio-analyst",
+          "retirement-pacer"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "portfolio-analyst",
+            "retirement-pacer"
+          ],
+          "tier": "mid",
+          "latencyMs": 7845,
+          "answer": "We cannot assess the aggressiveness of your retirement allocation at this time because we lack your portfolio holdings data.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        },
+        {
+          "trialIndex": 1,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "portfolio-analyst",
+            "retirement-pacer"
+          ],
+          "tier": "mid",
+          "latencyMs": 9468,
+          "answer": "We cannot assess if your retirement allocation is aggressive enough at this time because we do not have access to your current investment holdings or balances. Our records indicate a total balance of $0.00.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        }
+      ],
+      "passAtOne": true,
+      "passAtK": true,
+      "passHatK": true,
+      "routerAccuracyAtK": 1
+    },
+    {
+      "question": {
+        "id": "cap-life-change-marriage",
+        "message": "Heads up — I got married last month and my wife and I will be filing jointly going forward.",
+        "suite": "capability",
+        "expectedSpecialists": [
+          "tax-planner",
+          "general-advisor"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "goal-tracker",
+            "tax-planner"
+          ],
+          "tier": "mid",
+          "latencyMs": 5784,
+          "answer": "Congratulations on your marriage! Your profile has been updated to reflect that you are married and will be filing jointly, which is a significant change impacting your financial planning, especially regarding taxes and retirement contributions.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        },
+        {
+          "trialIndex": 1,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "goal-tracker",
+            "tax-planner"
+          ],
+          "tier": "mid",
+          "latencyMs": 5967,
+          "answer": "Congratulations on your marriage! Your profile has been updated to reflect your married filing jointly status, which will impact your financial planning, particularly regarding taxes and shared goals.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": null
+        }
+      ],
+      "passAtOne": false,
+      "passAtK": false,
+      "passHatK": false,
+      "routerAccuracyAtK": 0
+    }
+  ]
+}

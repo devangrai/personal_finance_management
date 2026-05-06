@@ -1,0 +1,11 @@
+id: "goals-progress-checkin"
+description: "Check progress against saved goals. Should route to goal-tracker, call get_goals and get_goal_progress."
+user_turns:
+  - "How am I doing on the goals I've saved?"
+expected:
+  specialists: ["goal-tracker"]
+  tier: ["fast", "mid"]
+  required_tools_called: ["get_goals"]
+  forbidden_tools_called: ["save_user_goal", "deactivate_goal"]
+  answer_must_contain: ["retirement"]
+  max_tool_calls_total: 4

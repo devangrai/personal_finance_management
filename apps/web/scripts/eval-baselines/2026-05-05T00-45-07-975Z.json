@@ -1,0 +1,520 @@
+{
+  "ranAt": "2026-05-05T00:45:07.975Z",
+  "baseUrl": "http://localhost:3001",
+  "results": [
+    {
+      "question": {
+        "id": "spending-dining-trend",
+        "message": "Is my dining spending going up or down?",
+        "expectedSpecialists": [
+          "spending-coach"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "spending-coach"
+      ],
+      "synthesized": false,
+      "latencyMs": 2072,
+      "answer": "Your dining spending has remained flat.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "spending-coach": 1
+      },
+      "specialistsOk": {
+        "spending-coach": true
+      },
+      "stoppedReasons": {
+        "spending-coach": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "spending-amazon-total",
+        "message": "How much did I spend at Amazon over the last three months?",
+        "expectedSpecialists": [
+          "spending-coach"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "spending-coach"
+      ],
+      "synthesized": false,
+      "latencyMs": 2496,
+      "answer": "I couldn't find any transactions at Amazon over the last three months.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "spending-coach": 1
+      },
+      "specialistsOk": {
+        "spending-coach": true
+      },
+      "stoppedReasons": {
+        "spending-coach": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "spending-subscriptions",
+        "message": "Show me my recurring subscriptions.",
+        "expectedSpecialists": [
+          "spending-coach"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "spending-coach"
+      ],
+      "synthesized": false,
+      "latencyMs": 3041,
+      "answer": "I don't see any recurring subscriptions or bills detected in your account. This could mean you don't have any, or they might not be set up in a way that I can automatically detect them.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "spending-coach": 1
+      },
+      "specialistsOk": {
+        "spending-coach": true
+      },
+      "stoppedReasons": {
+        "spending-coach": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "goal-list-progress",
+        "message": "How am I doing on my goals?",
+        "expectedSpecialists": [
+          "goal-tracker"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "goal-tracker"
+      ],
+      "synthesized": false,
+      "latencyMs": 2613,
+      "answer": "You're currently behind on your Emergency Fund goal, with $0 saved towards your $50,000 target. For your other goals, I need more information to track your progress.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "goal-tracker": 2
+      },
+      "specialistsOk": {
+        "goal-tracker": true
+      },
+      "stoppedReasons": {
+        "goal-tracker": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "goal-commit-new",
+        "message": "I want to commit to saving $20,000 for a down payment by the end of 2027.",
+        "expectedSpecialists": [
+          "goal-tracker"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "goal-tracker"
+      ],
+      "synthesized": false,
+      "latencyMs": 4136,
+      "answer": "I've recorded your commitment to save $20,000 for a down payment by the end of 2027.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "goal-tracker": 3
+      },
+      "specialistsOk": {
+        "goal-tracker": true
+      },
+      "stoppedReasons": {
+        "goal-tracker": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "portfolio-allocation-overview",
+        "message": "How is my portfolio allocated between retirement and taxable?",
+        "expectedSpecialists": [
+          "portfolio-analyst"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "portfolio-analyst"
+      ],
+      "synthesized": false,
+      "latencyMs": 2114,
+      "answer": "I don't have any data on your holdings yet. To analyze your portfolio allocation, please import your investment data.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "portfolio-analyst": 1
+      },
+      "specialistsOk": {
+        "portfolio-analyst": true
+      },
+      "stoppedReasons": {
+        "portfolio-analyst": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "portfolio-concentration",
+        "message": "Am I too concentrated in any single holding?",
+        "expectedSpecialists": [
+          "portfolio-analyst"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "portfolio-analyst"
+      ],
+      "synthesized": false,
+      "latencyMs": 2047,
+      "answer": "I cannot determine your concentration risk because no holdings data has been imported. Please import a Fidelity holdings CSV to enable this analysis.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "portfolio-analyst": 1
+      },
+      "specialistsOk": {
+        "portfolio-analyst": true
+      },
+      "stoppedReasons": {
+        "portfolio-analyst": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "tax-401k-limit",
+        "message": "What is the 401k contribution limit this year and how close am I?",
+        "expectedSpecialists": [
+          "tax-planner"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": false,
+      "specialistsInvoked": [
+        "tax-planner",
+        "retirement-pacer"
+      ],
+      "synthesized": true,
+      "latencyMs": 11262,
+      "answer": "The 401(k) elective deferral limit for 2024 is $23,000. Based on your current biweekly contributions of $2,108.08, your projected annual contribution is approximately $54,810.08, which significantly exceeds this limit.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "tax-planner": 2,
+        "retirement-pacer": 2
+      },
+      "specialistsOk": {
+        "tax-planner": true,
+        "retirement-pacer": true
+      },
+      "stoppedReasons": {
+        "tax-planner": "final_answer",
+        "retirement-pacer": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "tax-roth-ira-phaseout",
+        "message": "Am I above the Roth IRA phaseout for single filers?",
+        "expectedSpecialists": [
+          "tax-planner"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "tax-planner"
+      ],
+      "synthesized": false,
+      "latencyMs": 5084,
+      "answer": "Your filing status is married filing jointly, so the phase-out limits for single filers do not apply to you. For 2026, the Roth IRA contribution phase-out range for those married filing jointly begins at an income of $242,000 and ends at $252,000. For 2025, this range is $236,000 to $246,000.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "tax-planner": 3
+      },
+      "specialistsOk": {
+        "tax-planner": true
+      },
+      "stoppedReasons": {
+        "tax-planner": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "retirement-pacing",
+        "message": "Am I on pace for retirement given my age?",
+        "expectedSpecialists": [
+          "retirement-pacer"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "retirement-pacer"
+      ],
+      "synthesized": false,
+      "latencyMs": 3413,
+      "answer": "At 28, you are on track to meet Fidelity's benchmark of having 1x your current salary saved by age 30. However, to achieve your target retirement age of 60, a consistent savings rate of 20% of your gross income is recommended.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "retirement-pacer": 3
+      },
+      "specialistsOk": {
+        "retirement-pacer": true
+      },
+      "stoppedReasons": {
+        "retirement-pacer": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "retirement-catchup",
+        "message": "Should I think about catchup contributions yet?",
+        "expectedSpecialists": [
+          "retirement-pacer"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "retirement-pacer"
+      ],
+      "synthesized": false,
+      "latencyMs": 7035,
+      "answer": "At 28, you are not yet eligible for catch-up contributions. These are designed for individuals aged 50 and over, allowing them to contribute an additional $8,000 to their 401(k)s or $1,000 to their IRAs in 2026.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "retirement-pacer": 2
+      },
+      "specialistsOk": {
+        "retirement-pacer": true
+      },
+      "stoppedReasons": {
+        "retirement-pacer": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "general-overall",
+        "message": "How am I doing overall?",
+        "expectedSpecialists": [
+          "general-advisor"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "general-advisor"
+      ],
+      "synthesized": false,
+      "latencyMs": 4570,
+      "answer": "It looks like you're actively working towards several financial goals, including a down payment, an emergency fund, a sabbatical fund, and increasing your retirement savings rate. You're also consistently contributing to your 401(k) and HSA.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "general-advisor": 2
+      },
+      "specialistsOk": {
+        "general-advisor": true
+      },
+      "stoppedReasons": {
+        "general-advisor": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "general-fuzzy",
+        "message": "Give me a quick snapshot of where things stand.",
+        "expectedSpecialists": [
+          "general-advisor"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "general-advisor"
+      ],
+      "synthesized": false,
+      "latencyMs": 4228,
+      "answer": "You have several active goals, including saving for a down payment ($20,000 by Dec 2027), building an emergency fund ($50,000 by July 2027), and funding a sabbatical ($18,000 by April 2025). You're also aiming for a 20% gross retirement savings rate by the end of 2026 and a target retirement age of 60.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "general-advisor": 2
+      },
+      "specialistsOk": {
+        "general-advisor": true
+      },
+      "stoppedReasons": {
+        "general-advisor": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "multi-retirement-tax",
+        "message": "Am I contributing too much to my 401k? How close am I to the IRS limit?",
+        "expectedSpecialists": [
+          "tax-planner",
+          "retirement-pacer"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "tax-planner",
+        "retirement-pacer"
+      ],
+      "synthesized": true,
+      "latencyMs": 7149,
+      "answer": "For 2024, the IRS limit for employee elective deferrals to a 401(k) is $23,000. If you are age 50 or older, you can contribute an additional $7,500 as a catch-up contribution, bringing the total to $30,500. For 2023, the limit was $22,500, with a $7,500 catch-up contribution. To determine if you are contributing too much, please provide your year-to-date contribution amount.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "tax-planner": 5,
+        "retirement-pacer": 4
+      },
+      "specialistsOk": {
+        "tax-planner": true,
+        "retirement-pacer": true
+      },
+      "stoppedReasons": {
+        "tax-planner": "final_answer",
+        "retirement-pacer": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "multi-spending-goal",
+        "message": "I want to cut my dining spending in half and track that as a goal.",
+        "expectedSpecialists": [
+          "spending-coach",
+          "goal-tracker"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "spending-coach",
+        "goal-tracker"
+      ],
+      "synthesized": true,
+      "latencyMs": 6512,
+      "answer": "Your goal to cut dining spending in half has been set up. To provide a specific target, I need to know your current dining spending.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "spending-coach": 2,
+        "goal-tracker": 1
+      },
+      "specialistsOk": {
+        "spending-coach": true,
+        "goal-tracker": true
+      },
+      "stoppedReasons": {
+        "spending-coach": "final_answer",
+        "goal-tracker": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "multi-portfolio-retirement",
+        "message": "Is my retirement allocation aggressive enough for someone my age?",
+        "expectedSpecialists": [
+          "portfolio-analyst",
+          "retirement-pacer"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "retirement-pacer",
+        "portfolio-analyst"
+      ],
+      "synthesized": true,
+      "latencyMs": 6031,
+      "answer": "I cannot assess if your retirement allocation is aggressive enough without knowing your current investment holdings.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "retirement-pacer": 2,
+        "portfolio-analyst": 2
+      },
+      "specialistsOk": {
+        "retirement-pacer": true,
+        "portfolio-analyst": true
+      },
+      "stoppedReasons": {
+        "retirement-pacer": "final_answer",
+        "portfolio-analyst": "final_answer"
+      }
+    },
+    {
+      "question": {
+        "id": "multi-full-sweep",
+        "message": "Look at my spending, retirement, and portfolio together and tell me what to focus on.",
+        "expectedSpecialists": [
+          "spending-coach",
+          "portfolio-analyst",
+          "retirement-pacer"
+        ]
+      },
+      "ok": true,
+      "error": null,
+      "routerCorrect": true,
+      "specialistsInvoked": [
+        "spending-coach",
+        "retirement-pacer",
+        "portfolio-analyst"
+      ],
+      "synthesized": true,
+      "latencyMs": 50087,
+      "answer": "I can see your goals to save for a down payment, an emergency fund, and a sabbatical, but I don't have your income or spending data. To give you a complete picture of where to focus, I'll need a few more details.",
+      "answerContainsAll": null,
+      "toolCallTotals": {
+        "spending-coach": 3,
+        "retirement-pacer": 5,
+        "portfolio-analyst": 4
+      },
+      "specialistsOk": {
+        "spending-coach": true,
+        "retirement-pacer": true,
+        "portfolio-analyst": true
+      },
+      "stoppedReasons": {
+        "spending-coach": "final_answer",
+        "retirement-pacer": "final_answer",
+        "portfolio-analyst": "final_answer"
+      }
+    }
+  ],
+  "summary": {
+    "total": 17,
+    "routerCorrectCount": 16,
+    "routerAccuracyPercent": 94.11764705882352,
+    "allAnsweredCount": 17,
+    "anyFailedCount": 0,
+    "multiDomainSynthesizedCount": 5,
+    "avgLatencyMs": 7287.64705882353
+  }
+}

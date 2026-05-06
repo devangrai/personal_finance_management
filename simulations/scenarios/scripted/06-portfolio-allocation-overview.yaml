@@ -1,0 +1,10 @@
+id: "portfolio-allocation-overview"
+description: "Portfolio allocation snapshot. Should route to portfolio-analyst, call analyze_allocation."
+user_turns:
+  - "Give me a breakdown of where my investments sit right now — retirement vs taxable, concentration, that kind of thing."
+expected:
+  specialists: ["portfolio-analyst"]
+  tier: ["mid", "deep"]
+  required_tools_called: ["analyze_allocation"]
+  answer_must_not_contain: ["buy more of", "i recommend selling"]
+  max_tool_calls_total: 4

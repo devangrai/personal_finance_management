@@ -1,0 +1,36 @@
+{
+  "name": "portfolio-financial-manager",
+  "private": true,
+  "packageManager": "npm@11.12.1",
+  "engines": {
+    "node": ">=22 <26"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "workers/*"
+  ],
+  "scripts": {
+    "build": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; turbo run build'",
+    "dev": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; turbo run dev --parallel'",
+    "dev:web": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; export PORT=${PORT:-3001}; set -a; [ -f .env ] && . ./.env; set +a; export NEXT_PUBLIC_APP_URL=\"http://localhost:${PORT}\"; npm run dev --workspace @portfolio/web'",
+    "typecheck": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; turbo run typecheck'",
+    "db:generate": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; npm run db:generate --workspace @portfolio/db'",
+    "db:migrate": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; npm run db:migrate --workspace @portfolio/db'",
+    "fidelity:import:preview": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; node scripts/run-fidelity-import.mjs --mode preview'",
+    "fidelity:import:commit": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; node scripts/run-fidelity-import.mjs --mode commit'",
+    "regression": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; npx tsx scripts/regression-gate.ts'",
+    "test": "sh -lc 'if [ -d \"${HOMEBREW_PREFIX:-/opt/homebrew}/bin\" ]; then export PATH=\"${HOMEBREW_PREFIX:-/opt/homebrew}/bin:$PATH\"; fi; set -a; [ -f .env ] && . ./.env; set +a; npx vitest run'"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "prisma": "^6.3.1",
+    "tsx": "^4.19.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.5",
+    "yaml": "^2.8.4"
+  }
+}

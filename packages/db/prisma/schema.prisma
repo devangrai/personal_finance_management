@@ -1,0 +1,990 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+enum PlaidEnvironment {
+  sandbox
+  development
+  production
+}
+
+enum PlaidItemStatus {
+  active
+  error
+  needs_reauth
+  disconnected
+}
+
+enum AccountType {
+  depository
+  credit
+  investment
+  loan
+  other
+}
+
+enum TransactionDirection {
+  debit
+  credit
+}
+
+enum TransactionReviewStatus {
+  uncategorized
+  auto_categorized
+  user_categorized
+  ignored
+}
+
+enum RuleMatchType {
+  merchant_name
+  transaction_name
+  plaid_category
+  account_name
+  exact
+  contains
+  regex
+}
+
+enum RecommendationType {
+  budget
+  emergency_fund
+  retirement
+  portfolio
+  tax
+  general
+}
+
+enum RecommendationRunStatus {
+  succeeded
+  failed
+  partial
+}
+
+enum DailyReviewDigestStatus {
+  pending
+  sent
+  acknowledged
+  failed
+}
+
+enum RecurrenceFrequency {
+  weekly
+  biweekly
+  semimonthly
+  monthly
+  quarterly
+  annually
+  ad_hoc
+}
+
+enum HousingStatus {
+  rent_free
+  rent
+  mortgage
+  other
+}
+
+enum RiskTolerance {
+  conservative
+  moderate
+  aggressive
+  unknown
+}
+
+enum ManualInvestmentBucket {
+  retirement
+  taxable
+  other
+}
+
+model User {
+  id                 String                @id @default(cuid())
+  email              String?               @unique
+  displayName        String?
+  passwordHash       String?
+  emailVerified      DateTime?
+  isAdmin            Boolean               @default(false)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  profile            UserProfile?
+  plaidItems         PlaidItem[]
+  accounts           Account[]
+  categories         TransactionCategory[]
+  transactions       Transaction[]
+  transactionRules   TransactionRule[]
+  holdingSnapshots   HoldingSnapshot[]
+  investmentTxns     InvestmentTransaction[]
+  manualInvestmentAccounts  ManualInvestmentAccount[]
+  manualHoldingSnapshots    ManualHoldingSnapshot[]
+  manualInvestmentTxns      ManualInvestmentTransaction[]
+  recommendationRuns RecommendationRun[]
+  dailyReviewDigests DailyReviewDigest[]
+  goals              UserGoal[]
+  facts              UserFact[]
+  extractedFacts     ExtractedFact[]
+  proactiveNudges    ProactiveNudge[]
+  userDocuments      UserDocument[]
+  documentChunks     DocumentChunk[]
+  budgets            Budget[]
+  manualAssetsLiabilities ManualAssetLiability[]
+  netWorthSnapshots  NetWorthSnapshot[]
+  monthlyReviews     MonthlyReview[]
+  candidateLessons   CandidateLesson[]
+  agentLessons       AgentLesson[]
+  snapTradeUser      SnapTradeUser?
+  snapTradeConnections SnapTradeConnection[]
+  authAccounts       AuthAccount[]
+  authSessions       AuthSession[]
+  chatSessions       ChatSession[]
+}
+
+model UserProfile {
+  id                             String              @id @default(cuid())
+  userId                         String              @unique
+  birthYear                      Int?
+  stateCode                      String?
+  housingStatus                  HousingStatus       @default(rent_free)
+  dependents                     Int                 @default(0)
+  annualIncomeCents              BigInt?
+  biweeklyNetPayCents            BigInt?
+  monthlyFixedExpenseCents       BigInt?
+  paycheckFrequency              RecurrenceFrequency?
+  currentEmergencyFundTargetCents BigInt?
+  targetRetirementSavingsRateBps Int?
+  riskTolerance                  RiskTolerance       @default(unknown)
+  notes                          String?
+  createdAt                      DateTime            @default(now())
+  updatedAt                      DateTime            @updatedAt
+  user                           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PlaidItem {
+  id                   String             @id @default(cuid())
+  userId               String
+  plaidItemId          String             @unique
+  plaidEnvironment     PlaidEnvironment   @default(sandbox)
+  institutionId        String?
+  institutionName      String?
+  accessTokenEncrypted String
+  status               PlaidItemStatus    @default(active)
+  transactionsCursor   String?
+  lastWebhookAt        DateTime?
+  lastSyncedAt         DateTime?
+  errorCode            String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts             Account[]
+}
+
+model Account {
+  id                String                  @id @default(cuid())
+  userId            String
+  plaidItemId       String
+  plaidAccountId    String                  @unique
+  name              String
+  officialName      String?
+  mask              String?
+  subtype           String?
+  type              AccountType
+  isoCurrencyCode   String?                 @default("USD")
+  currentBalance    Decimal?                @db.Decimal(18, 2)
+  availableBalance  Decimal?                @db.Decimal(18, 2)
+  isActive          Boolean                 @default(true)
+  // When true, this account is hidden from net-worth aggregates. Used
+  // for accounts the user considers "not mine" (duplicate links, shared
+  // accounts, hypothetical assets they don't control).
+  excludeFromNetWorth Boolean               @default(false)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plaidItem         PlaidItem               @relation(fields: [plaidItemId], references: [id], onDelete: Cascade)
+  transactions      Transaction[]
+  holdingSnapshots  HoldingSnapshot[]
+  investmentTxns    InvestmentTransaction[]
+
+  @@index([userId, type])
+}
+
+model TransactionCategory {
+  id         String            @id @default(cuid())
+  userId     String
+  key        String
+  label      String
+  parentKey  String?
+  isSystem   Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  aiSuggestedTransactions Transaction[] @relation("AiSuggestedTransactionCategory")
+  rules      TransactionRule[]
+  budgets    Budget[]
+
+  @@unique([userId, key])
+}
+
+model Transaction {
+  id                        String                   @id @default(cuid())
+  userId                    String
+  accountId                 String
+  plaidTransactionId        String                   @unique
+  pendingTransactionId      String?
+  date                      DateTime
+  authorizedDate            DateTime?
+  name                      String
+  merchantName              String?
+  amount                    Decimal                  @db.Decimal(18, 2)
+  isoCurrencyCode           String?                  @default("USD")
+  direction                 TransactionDirection
+  isPending                 Boolean                  @default(false)
+  plaidCategory             Json?
+  personalFinanceCategory   String?
+  categoryId                String?
+  aiSuggestedCategoryId     String?
+  aiSuggestedConfidence     Int?
+  aiSuggestedReason         String?
+  aiSuggestedByModel        String?
+  aiSuggestedAt             DateTime?
+  reviewStatus              TransactionReviewStatus  @default(uncategorized)
+  notes                     String?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  user                      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account                   Account                  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category                  TransactionCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  aiSuggestedCategory       TransactionCategory?     @relation("AiSuggestedTransactionCategory", fields: [aiSuggestedCategoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+  @@index([accountId, date])
+  @@index([categoryId, date])
+  @@index([aiSuggestedCategoryId, date])
+}
+
+model DailyReviewDigest {
+  id                   String                  @id @default(cuid())
+  userId               String
+  localDateKey         String
+  timezone             String
+  scheduledHourLocal   Int
+  transactionCount     Int                     @default(0)
+  autoCategorizedCount Int                     @default(0)
+  uncategorizedCount   Int                     @default(0)
+  reviewUrl            String?
+  pingSummary          String?
+  status               DailyReviewDigestStatus @default(pending)
+  sentAt               DateTime?
+  acknowledgedAt       DateTime?
+  lastError            String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, localDateKey])
+  @@index([userId, status])
+}
+
+model TransactionRule {
+  id               String              @id @default(cuid())
+  userId           String
+  name             String
+  priority         Int                 @default(100)
+  isActive         Boolean             @default(true)
+  matchType        RuleMatchType
+  matchValue       String
+  categoryId       String
+  accountId        String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category         TransactionCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([userId, priority])
+}
+
+model HoldingSnapshot {
+  id                   String    @id @default(cuid())
+  userId               String
+  accountId            String
+  asOf                 DateTime
+  securityId           String?
+  symbol               String?
+  securityName         String
+  quantity             Decimal?  @db.Decimal(24, 8)
+  institutionPrice     Decimal?  @db.Decimal(18, 4)
+  institutionValue     Decimal?  @db.Decimal(18, 2)
+  costBasis            Decimal?  @db.Decimal(18, 2)
+  isoCurrencyCode      String?   @default("USD")
+  createdAt            DateTime  @default(now())
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account              Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, asOf])
+  @@index([accountId, asOf])
+}
+
+model InvestmentTransaction {
+  id                           String    @id @default(cuid())
+  userId                       String
+  accountId                    String
+  plaidInvestmentTransactionId String    @unique
+  securityId                   String?
+  symbol                       String?
+  name                         String
+  type                         String
+  subtype                      String?
+  amount                       Decimal   @db.Decimal(18, 2)
+  quantity                     Decimal?  @db.Decimal(24, 8)
+  price                        Decimal?  @db.Decimal(18, 4)
+  fees                         Decimal?  @db.Decimal(18, 2)
+  date                         DateTime
+  isoCurrencyCode              String?   @default("USD")
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
+  user                         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account                      Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@index([accountId, date])
+}
+
+model ManualInvestmentAccount {
+  id                    String                      @id @default(cuid())
+  userId                String
+  source                String
+  accountKey            String                      @unique
+  name                  String
+  subtype               String?
+  bucket                ManualInvestmentBucket      @default(other)
+  isoCurrencyCode       String?                     @default("USD")
+  lastImportedAt        DateTime?
+  // When true, this account is hidden from net-worth aggregates. Useful
+  // for unvested RSU accounts, partner/shared accounts, etc.
+  excludeFromNetWorth   Boolean                     @default(false)
+  // When this account comes from SnapTrade (source="snaptrade"), this FK
+  // points at the SnapTradeConnection that owns it. CSV-imported accounts
+  // (source="manual") and Plaid-backed ones (source="plaid") leave this null.
+  snapTradeConnectionId String?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  user                  User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapTradeConnection   SnapTradeConnection?        @relation(fields: [snapTradeConnectionId], references: [id], onDelete: SetNull)
+  holdingSnapshots      ManualHoldingSnapshot[]
+  investmentTxns        ManualInvestmentTransaction[]
+
+  @@index([userId, source])
+  @@index([userId, bucket])
+  @@index([snapTradeConnectionId])
+}
+
+model ManualHoldingSnapshot {
+  id                       String                 @id @default(cuid())
+  userId                   String
+  manualInvestmentAccountId String
+  rowFingerprint           String
+  asOf                     DateTime
+  securityId               String?
+  symbol                   String?
+  securityName             String
+  quantity                 Decimal?               @db.Decimal(24, 8)
+  institutionPrice         Decimal?               @db.Decimal(18, 4)
+  institutionValue         Decimal?               @db.Decimal(18, 2)
+  costBasis                Decimal?               @db.Decimal(18, 2)
+  isoCurrencyCode          String?                @default("USD")
+  rawRow                   Json?
+  createdAt                DateTime               @default(now())
+  user                     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  manualInvestmentAccount  ManualInvestmentAccount @relation(fields: [manualInvestmentAccountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, asOf])
+  @@index([manualInvestmentAccountId, asOf])
+  @@unique([manualInvestmentAccountId, asOf, rowFingerprint])
+}
+
+model ManualInvestmentTransaction {
+  id                       String                 @id @default(cuid())
+  userId                   String
+  manualInvestmentAccountId String
+  rowFingerprint           String
+  securityId               String?
+  symbol                   String?
+  name                     String
+  type                     String
+  subtype                  String?
+  amount                   Decimal                @db.Decimal(18, 2)
+  quantity                 Decimal?               @db.Decimal(24, 8)
+  price                    Decimal?               @db.Decimal(18, 4)
+  fees                     Decimal?               @db.Decimal(18, 2)
+  date                     DateTime
+  isoCurrencyCode          String?                @default("USD")
+  rawRow                   Json?
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  user                     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  manualInvestmentAccount  ManualInvestmentAccount @relation(fields: [manualInvestmentAccountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@index([manualInvestmentAccountId, date])
+  @@unique([manualInvestmentAccountId, rowFingerprint])
+}
+
+model RecommendationRun {
+  id              String                  @id @default(cuid())
+  userId          String
+  type            RecommendationType
+  status          RecommendationRunStatus @default(succeeded)
+  inputSnapshot   Json
+  outputPayload   Json
+  createdAt       DateTime                @default(now())
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, createdAt])
+}
+
+model UserGoal {
+  id               String    @id @default(cuid())
+  userId           String
+  goalKey          String
+  label            String
+  targetValueCents BigInt?
+  targetDate       DateTime?
+  commitment       String?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, goalKey])
+  @@index([userId, isActive])
+}
+
+enum UserFactSource {
+  conversation
+  profile
+  import
+  manual
+}
+
+model UserFact {
+  id         String         @id @default(cuid())
+  userId     String
+  factKey    String
+  factValue  Json
+  confidence Int?
+  source     UserFactSource @default(conversation)
+  notes      String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, factKey])
+  @@index([userId, source])
+}
+
+enum LessonKind {
+  preference
+  advice_lesson
+}
+
+enum LessonTopic {
+  tax
+  retirement
+  spending
+  portfolio
+  goals
+  general
+}
+
+enum CandidateLessonStatus {
+  pending
+  graduated
+  rejected
+  reopened
+}
+
+/**
+ * A staged pattern observed across recent RecommendationRuns, awaiting human
+ * or agent-initiated graduation. Mechanical clustering populates these.
+ * The agent does not self-graduate — a graduation requires explicit
+ * confirmation (via /api/lessons/graduate or the graduate_candidate_lesson
+ * tool responding to a clear user signal).
+ */
+model CandidateLesson {
+  id               String                @id @default(cuid())
+  userId           String
+  kind             LessonKind
+  topic            LessonTopic
+  patternSummary   String
+  evidenceRunIds   Json                  // string[] of RecommendationRun ids
+  clusterStrength  Int
+  status           CandidateLessonStatus @default(pending)
+  rationale        String?               // populated on graduate/reject
+  reviewedAt       DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, topic, status])
+}
+
+/**
+ * A graduated lesson — the advisor can read this back during future turns.
+ * Distilled from one or more CandidateLessons.
+ */
+model AgentLesson {
+  id                 String      @id @default(cuid())
+  userId             String
+  kind               LessonKind
+  topic              LessonTopic
+  patternSummary     String      // what we observed
+  actionOrCaveat     String      // what the advisor should do about it
+  evidenceRunIds     Json        // string[] frozen at graduation time
+  relevanceKeywords  Json        // string[] for topic-filtered retrieval
+  rationale          String?     // graduation rationale
+  timesApplied       Int         @default(0)
+  lastAppliedAt      DateTime?
+  candidateLessonId  String?     // link back if graduated from a candidate
+  graduatedAt        DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, topic])
+  @@index([userId, kind, topic])
+}
+
+
+// ---------------------------------------------------------------------------
+// SnapTrade integration (Fidelity + other brokerages via Fidelity-Access-style
+// OAuth). Parallel to PlaidItem for banking, but for brokerages. Accounts
+// surfaced by SnapTrade land in ManualInvestmentAccount with source="snaptrade"
+// and link back here via snapTradeConnectionId.
+// ---------------------------------------------------------------------------
+
+enum SnapTradeConnectionStatus {
+  active
+  disabled
+  error
+}
+
+model SnapTradeUser {
+  id                           String                @id @default(cuid())
+  userId                       String                @unique
+  snaptradeUserId              String                @unique
+  snaptradeUserSecretEncrypted String
+  registeredAt                 DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+  user                         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connections                  SnapTradeConnection[]
+}
+
+model SnapTradeConnection {
+  id                     String                    @id @default(cuid())
+  userId                 String
+  snapTradeUserId        String
+  authorizationId        String                    @unique
+  brokerageSlug          String
+  brokerageName          String
+  status                 SnapTradeConnectionStatus @default(active)
+  disabledReason         String?
+  lastSyncedAt           DateTime?
+  lastHoldingsUpdatedAt  DateTime?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  user                   User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapTradeUser          SnapTradeUser             @relation(fields: [snapTradeUserId], references: [id], onDelete: Cascade)
+  accounts               ManualInvestmentAccount[]
+
+  @@index([userId, status])
+}
+
+
+// ---------------------------------------------------------------------------
+// Auth.js (NextAuth) adapter tables. Named Auth* to avoid collision with our
+// existing Account/Session models. Prisma adapter accepts custom model names
+// via the table-name option in code; see apps/web/lib/auth.ts.
+// ---------------------------------------------------------------------------
+
+model AuthAccount {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model AuthSession {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AuthVerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+
+// ---------------------------------------------------------------------------
+// Persistent chat sessions (ChatGPT-style multi-session UX). Each session
+// holds an ordered list of ChatMessage rows. Long-term memory (graduated
+// AgentLessons, UserFact personal context) is shared across all sessions
+// so the advisor still "knows" you regardless of which conversation you're
+// in — sessions are just organized threads, not isolated contexts.
+// ---------------------------------------------------------------------------
+
+model ChatSession {
+  id          String        @id @default(cuid())
+  userId      String
+  title       String?       // "New chat" until first user message is appended
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
+  archivedAt  DateTime?
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    ChatMessage[]
+
+  @@index([userId, archivedAt])
+  @@index([userId, updatedAt])
+}
+
+model ChatMessage {
+  id                  String      @id @default(cuid())
+  sessionId           String
+  role                String      // "user" | "assistant" | "system"
+  content             String      @db.Text
+  // Assistant-only metadata: specialists, toolCalls, appliedLessons, latencyMs,
+  // routerTier, routerSource, synthesized, etc. Kept as Json so we can
+  // evolve the shape without schema churn.
+  metadata            Json?
+  // Loose link back to the audit-log RecommendationRun row if one was
+  // written for this turn. Nullable so user messages don't need one.
+  recommendationRunId String?
+  createdAt           DateTime    @default(now())
+  session             ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+
+// ---------------------------------------------------------------------------
+// Signup invites: single-use codes admin mints so family members can register.
+// Invite-gated signup avoids open-internet-signup attack surface at this
+// small scale.
+// ---------------------------------------------------------------------------
+
+model SignupInvite {
+  id             String    @id @default(cuid())
+  code           String    @unique
+  // Optional scope: if set, only this email can redeem the invite.
+  intendedEmail  String?
+  createdByUserId String
+  expiresAt      DateTime
+  usedAt         DateTime?
+  usedByUserId   String?
+  note           String?
+  createdAt      DateTime  @default(now())
+
+  @@index([expiresAt, usedAt])
+}
+
+
+// ---------------------------------------------------------------------------
+// Conversational fact extraction (Phase 1+).
+//
+// Every chat turn runs a background "fact-extractor" LLM that looks at the
+// user+assistant exchange and detects things worth remembering: user facts
+// (income, bracket, state, etc.), goal commitments, major obligations.
+//
+// Extractions land here with a full audit trail. High-confidence / low-stakes
+// ones auto-apply into UserFact / UserGoal; everything else is staged for the
+// user to confirm via /context "Recent updates".
+//
+// previousValue snapshots enable one-click undo after an auto-apply.
+// ---------------------------------------------------------------------------
+
+enum ExtractedFactKind {
+  fact          // upserts UserFact (e.g. marginal_tax_bracket)
+  goal          // creates UserGoal
+  goal_progress // updates existing UserGoal (targetValue / targetDate / label)
+  obligation    // UserFact with structured key (e.g. mortgage_balance)
+  revert        // user corrected a prior extraction
+}
+
+enum ExtractedFactStatus {
+  auto_applied
+  staged
+  confirmed
+  rejected
+  superseded
+  reverted
+}
+
+model ExtractedFact {
+  id              String              @id @default(cuid())
+  userId          String
+  chatMessageId   String?             // assistant message that triggered this
+  sessionId       String?
+  // When set, this extraction was produced from an uploaded document
+  // (Week 7). The page / sourceRegion fields locate the evidence within it.
+  userDocumentId  String?
+  page            Int?
+  sourceRegion    Json?
+  kind            ExtractedFactKind
+  status          ExtractedFactStatus
+  factKey         String?             // populated for kind=fact/obligation
+  goalKey         String?             // populated for kind=goal/goal_progress
+  newValue        Json
+  previousValue   Json?               // snapshot for undo
+  confidence      Float
+  evidence        String              @db.Text
+  reasoning       String?             @db.Text
+  stakesLevel     String              // "low" | "medium" | "high"
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  appliedAt       DateTime?
+  revertedAt      DateTime?
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document        UserDocument?       @relation(fields: [userDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+  @@index([userId, kind, createdAt])
+  @@index([userDocumentId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Proactive nudges (Phase 4).
+//
+// Weekly cron surfaces 1-2 observations per user: spending anomalies, goal
+// check-ins, portfolio drift, cash drag. Delivered as a read-only insights
+// widget on the chat page (user clicks to engage, never auto-injected).
+// ---------------------------------------------------------------------------
+
+enum ProactiveNudgeKind {
+  spending_anomaly
+  goal_checkin
+  portfolio_drift
+  cash_sweep
+  budget_exceeded
+  other
+}
+
+enum ProactiveNudgeStatus {
+  pending
+  surfaced
+  dismissed
+  acted_on
+}
+
+model ProactiveNudge {
+  id              String               @id @default(cuid())
+  userId          String
+  kind            ProactiveNudgeKind
+  headline        String               @db.Text
+  detail          String               @db.Text
+  suggestedAction String?              @db.Text
+  priority        Int                  @default(50)   // 0-100
+  status          ProactiveNudgeStatus @default(pending)
+  evidencePayload Json?
+  surfacedAt      DateTime?
+  createdAt       DateTime             @default(now())
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+}
+
+
+// ---------------------------------------------------------------------------
+// Uploaded documents (Week 7).
+//
+// Users upload tax forms, W-2s, comp statements, brokerage statements, etc.
+// The file is stored in blob storage; we run Gemini Vision to extract key
+// facts and stage them for user confirmation. Confirmed facts land in
+// UserFact with source=import, where they feed the specialist primer just
+// like any other known fact.
+//
+// The original file is kept forever (per user retention pref) so the advisor
+// can quote exact numbers / locate source regions on the page.
+// ---------------------------------------------------------------------------
+
+enum UserDocumentStatus {
+  pending       // row created, blob upload in progress
+  processing    // file stored, extraction running
+  ready         // extraction complete (may have 0 extractions — user reviews)
+  failed        // extraction errored; errorMessage has details
+}
+
+model UserDocument {
+  id               String             @id @default(cuid())
+  userId           String
+  title            String                                  // user-editable, e.g. "2024 W-2"
+  originalFilename String
+  mimeType         String
+  sizeBytes        Int
+  pageCount        Int?
+  storageKey       String             @unique              // blob path
+  documentType     String             @default("other")    // free-form; UI suggests common types
+  status           UserDocumentStatus @default(pending)
+  errorMessage     String?            @db.Text
+  uploadedAt       DateTime           @default(now())
+  processedAt      DateTime?
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  extractions      ExtractedFact[]
+  chunks           DocumentChunk[]
+
+  @@index([userId, status])
+  @@index([userId, uploadedAt])
+}
+
+
+// ---------------------------------------------------------------------------
+// Document chunks for RAG (Week 8).
+//
+// Each uploaded document is split into 500-1000 token chunks with overlap,
+// each chunk gets a 768-dim embedding from Gemini's text-embedding-004.
+// Stored here with a pgvector HNSW index for sub-linear similarity search.
+//
+// Prisma doesn't natively understand pgvector; `embedding` is declared as
+// Unsupported, and all writes/queries go through raw SQL in document-chunker.
+// ---------------------------------------------------------------------------
+
+model DocumentChunk {
+  id             String       @id @default(cuid())
+  userId         String                                 // denormalized for scoped queries
+  userDocumentId String
+  chunkIndex     Int                                    // 0-based order within the doc
+  page           Int?                                   // 1-indexed if known
+  text           String       @db.Text                  // chunk content
+  embedding      Unsupported("vector(768)")             // pgvector; 768-dim Gemini embeddings
+  tokenCount     Int
+  createdAt      DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document       UserDocument @relation(fields: [userDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userDocumentId, chunkIndex])
+}
+
+
+// ---------------------------------------------------------------------------
+// Budgets (Week 9).
+//
+// Monthly spending targets per category. `activeFromMonth` lets a budget
+// apply forward indefinitely until it's changed — setting dining=$500
+// in June carries into July/August/... automatically; bumping to $600
+// in September creates a new row so June-August queries see $500 and
+// September+ sees $600 (history-correct).
+//
+// categoryId=null represents the catch-all "uncategorized" bucket so
+// users can budget against transactions that don't hit a specific
+// category.
+// ---------------------------------------------------------------------------
+
+model Budget {
+  id                  String                @id @default(cuid())
+  userId              String
+  categoryId          String?                                      // null = uncategorized bucket
+  monthlyAmountCents  BigInt                                       // target in cents
+  activeFromMonth     DateTime                                     // first of month the budget applies from
+  notes               String?               @db.Text
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category            TransactionCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, categoryId, activeFromMonth])
+  @@index([userId, activeFromMonth])
+}
+
+
+// ---------------------------------------------------------------------------
+// Net Worth (Week 10).
+//
+// Single-number view: cash + investments + manual assets
+//                   - credit cards - loans - manual liabilities
+//
+// Plaid-connected balances are computed on demand from Account +
+// HoldingSnapshot. Manual items (home value, car value, private loans)
+// live in ManualAssetLiability. A nightly cron writes a NetWorthSnapshot
+// so we have a time-series for charting and month-over-month deltas.
+// ---------------------------------------------------------------------------
+
+model ManualAssetLiability {
+  id          String   @id @default(cuid())
+  userId      String
+  kind        String                    // "asset" | "liability"
+  category    String                    // "real_estate" | "vehicle" | "private_loan" | "other"
+  label       String
+  amountCents BigInt                    // positive; kind determines sign
+  notes       String?                   @db.Text
+  updatedAt   DateTime                  @updatedAt
+  createdAt   DateTime                  @default(now())
+  user        User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind])
+}
+
+model NetWorthSnapshot {
+  id                     String   @id @default(cuid())
+  userId                 String
+  snapshotDate           DateTime                   // beginning-of-day UTC; unique per day
+  cashCents              BigInt
+  investmentsCents       BigInt
+  manualAssetsCents      BigInt
+  creditCardDebtCents    BigInt                     // positive = owed
+  loanDebtCents          BigInt
+  manualLiabilitiesCents BigInt
+  netWorthCents          BigInt
+  createdAt              DateTime @default(now())
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, snapshotDate])
+  @@index([userId, snapshotDate])
+}
+
+// ---------------------------------------------------------------------------
+// Monthly Review (Week 10).
+//
+// On the 1st of each month, a cron computes + persists a review for
+// the month that just ended: net-worth delta, savings rate, top
+// categories, budget outcomes, goal progress, notable transactions,
+// recurring changes. Also emailed to user.email.
+// ---------------------------------------------------------------------------
+
+model MonthlyReview {
+  id            String    @id @default(cuid())
+  userId        String
+  month         String                            // "YYYY-MM"
+  generatedAt   DateTime  @default(now())
+  snapshotJson  Json                              // the computed view
+  summaryText   String?   @db.Text                // LLM-generated paragraph
+  emailSentAt   DateTime?
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month])
+  @@index([userId, generatedAt])
+}

@@ -1,0 +1,12 @@
+id: "brokeragelink-contribution-search"
+description: "Search investment transactions for BrokerageLink activity. Either spending-coach or portfolio-analyst is a defensible pick - both will call search_transactions."
+user_turns:
+  - "Can you pull up all my BrokerageLink transfers from the last three months?"
+expected:
+  specialists:
+    - ["spending-coach"]
+    - ["portfolio-analyst"]
+  tier: ["fast", "mid"]
+  required_tools_called: ["search_transactions"]
+  forbidden_tools_called: ["save_user_fact", "save_user_goal"]
+  max_tool_calls_total: 4

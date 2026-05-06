@@ -1,0 +1,723 @@
+[
+  {
+    "scenario": {
+      "id": "irs-401k-limit-lookup",
+      "description": "Simple IRS limit lookup. Should route to tax-planner at fast tier, call get_irs_limits, quote $24,000.",
+      "user_turns": [
+        "Quick one — what's the 401k contribution limit for this year?"
+      ],
+      "expected": {
+        "specialists": [
+          "tax-planner"
+        ],
+        "tier": [
+          "fast",
+          "mid"
+        ],
+        "required_tools_called": [
+          "get_irs_limits"
+        ],
+        "forbidden_tools_called": [
+          "save_user_fact",
+          "save_user_goal",
+          "update_profile"
+        ],
+        "answer_must_contain": [
+          "24"
+        ],
+        "answer_must_not_contain": [
+          "recommend you should",
+          "we should file"
+        ],
+        "max_tool_calls_total": 3
+      }
+    },
+    "ok": false,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": false,
+        "detail": "got 401: {\"error\":\"Unauthorized\"}"
+      },
+      {
+        "name": "specialists_match",
+        "ok": false,
+        "detail": "expected one of [tax-planner] got []"
+      },
+      {
+        "name": "tier_match",
+        "ok": false,
+        "detail": "expected fast|mid got "
+      },
+      {
+        "name": "required_tool:get_irs_limits",
+        "ok": false,
+        "detail": "missing; got []"
+      },
+      {
+        "name": "forbidden_tool:save_user_fact",
+        "ok": true
+      },
+      {
+        "name": "forbidden_tool:save_user_goal",
+        "ok": true
+      },
+      {
+        "name": "forbidden_tool:update_profile",
+        "ok": true
+      },
+      {
+        "name": "answer_contains:24",
+        "ok": false,
+        "detail": "answer did not contain \"24\""
+      },
+      {
+        "name": "answer_forbidden:recommend you should",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:we should file",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [],
+    "tier": "",
+    "toolsCalled": [],
+    "answer": null,
+    "latencyMs": 58,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "brokeragelink-contribution-search",
+      "description": "Search investment transactions for BrokerageLink activity. Either spending-coach or portfolio-analyst is a defensible pick - both will call search_transactions.",
+      "user_turns": [
+        "Can you pull up all my BrokerageLink transfers from the last three months?"
+      ],
+      "expected": {
+        "specialists": [
+          [
+            "spending-coach"
+          ],
+          [
+            "portfolio-analyst"
+          ]
+        ],
+        "tier": [
+          "fast",
+          "mid"
+        ],
+        "required_tools_called": [
+          "search_transactions"
+        ],
+        "forbidden_tools_called": [
+          "save_user_fact",
+          "save_user_goal"
+        ],
+        "max_tool_calls_total": 4
+      }
+    },
+    "ok": false,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": false,
+        "detail": "got 401: {\"error\":\"Unauthorized\"}"
+      },
+      {
+        "name": "specialists_match",
+        "ok": false,
+        "detail": "expected one of [spending-coach] | [portfolio-analyst] got []"
+      },
+      {
+        "name": "tier_match",
+        "ok": false,
+        "detail": "expected fast|mid got "
+      },
+      {
+        "name": "required_tool:search_transactions",
+        "ok": false,
+        "detail": "missing; got []"
+      },
+      {
+        "name": "forbidden_tool:save_user_fact",
+        "ok": true
+      },
+      {
+        "name": "forbidden_tool:save_user_goal",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [],
+    "tier": "",
+    "toolsCalled": [],
+    "answer": null,
+    "latencyMs": 10,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "goals-progress-checkin",
+      "description": "Check progress against saved goals. Should route to goal-tracker, call get_goals and get_goal_progress.",
+      "user_turns": [
+        "How am I doing on the goals I've saved?"
+      ],
+      "expected": {
+        "specialists": [
+          "goal-tracker"
+        ],
+        "tier": [
+          "fast",
+          "mid"
+        ],
+        "required_tools_called": [
+          "get_goals"
+        ],
+        "forbidden_tools_called": [
+          "save_user_goal",
+          "deactivate_goal"
+        ],
+        "answer_must_contain": [
+          "retirement"
+        ],
+        "max_tool_calls_total": 4
+      }
+    },
+    "ok": false,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": false,
+        "detail": "got 401: {\"error\":\"Unauthorized\"}"
+      },
+      {
+        "name": "specialists_match",
+        "ok": false,
+        "detail": "expected one of [goal-tracker] got []"
+      },
+      {
+        "name": "tier_match",
+        "ok": false,
+        "detail": "expected fast|mid got "
+      },
+      {
+        "name": "required_tool:get_goals",
+        "ok": false,
+        "detail": "missing; got []"
+      },
+      {
+        "name": "forbidden_tool:save_user_goal",
+        "ok": true
+      },
+      {
+        "name": "forbidden_tool:deactivate_goal",
+        "ok": true
+      },
+      {
+        "name": "answer_contains:retirement",
+        "ok": false,
+        "detail": "answer did not contain \"retirement\""
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [],
+    "tier": "",
+    "toolsCalled": [],
+    "answer": null,
+    "latencyMs": 8,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "new-emergency-fund-goal",
+      "description": "User commits to a new emergency fund goal. Must call save_user_goal and confirm back.",
+      "user_turns": [
+        "I want to commit to building up a $50,000 emergency fund by July 2027. Save that for me?"
+      ],
+      "expected": {
+        "specialists": [
+          "goal-tracker"
+        ],
+        "tier": [
+          "fast",
+          "mid"
+        ],
+        "required_tools_called": [
+          "save_user_goal"
+        ],
+        "answer_must_contain": [
+          "50,000"
+        ],
+        "max_tool_calls_total": 4
+      }
+    },
+    "ok": false,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": false,
+        "detail": "got 401: {\"error\":\"Unauthorized\"}"
+      },
+      {
+        "name": "specialists_match",
+        "ok": false,
+        "detail": "expected one of [goal-tracker] got []"
+      },
+      {
+        "name": "tier_match",
+        "ok": false,
+        "detail": "expected fast|mid got "
+      },
+      {
+        "name": "required_tool:save_user_goal",
+        "ok": false,
+        "detail": "missing; got []"
+      },
+      {
+        "name": "answer_contains:50,000",
+        "ok": false,
+        "detail": "answer did not contain \"50,000\""
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [],
+    "tier": "",
+    "toolsCalled": [],
+    "answer": null,
+    "latencyMs": 10,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "retirement-pace-check",
+      "description": "Retirement pacing question. Should route to retirement-pacer, consult age/target-age facts and age-based target.",
+      "user_turns": [
+        "I'm 28 and aiming to retire at 60. Am I tracking well toward that?"
+      ],
+      "expected": {
+        "specialists": [
+          "retirement-pacer"
+        ],
+        "tier": [
+          "mid",
+          "deep"
+        ],
+        "required_tools_called": [
+          "get_advisor_plan"
+        ],
+        "forbidden_tools_called": [],
+        "max_tool_calls_total": 6
+      }
+    },
+    "ok": false,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": false,
+        "detail": "got 401: {\"error\":\"Unauthorized\"}"
+      },
+      {
+        "name": "specialists_match",
+        "ok": false,
+        "detail": "expected one of [retirement-pacer] got []"
+      },
+      {
+        "name": "tier_match",
+        "ok": false,
+        "detail": "expected mid|deep got "
+      },
+      {
+        "name": "required_tool:get_advisor_plan",
+        "ok": false,
+        "detail": "missing; got []"
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [],
+    "tier": "",
+    "toolsCalled": [],
+    "answer": null,
+    "latencyMs": 10,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "portfolio-allocation-overview",
+      "description": "Portfolio allocation snapshot. Should route to portfolio-analyst, call analyze_allocation.",
+      "user_turns": [
+        "Give me a breakdown of where my investments sit right now — retirement vs taxable, concentration, that kind of thing."
+      ],
+      "expected": {
+        "specialists": [
+          "portfolio-analyst"
+        ],
+        "tier": [
+          "mid",
+          "deep"
+        ],
+        "required_tools_called": [
+          "analyze_allocation"
+        ],
+        "answer_must_not_contain": [
+          "buy more of",
+          "i recommend selling"
+        ],
+        "max_tool_calls_total": 4
+      }
+    },
+    "ok": false,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": false,
+        "detail": "got 401: {\"error\":\"Unauthorized\"}"
+      },
+      {
+        "name": "specialists_match",
+        "ok": false,
+        "detail": "expected one of [portfolio-analyst] got []"
+      },
+      {
+        "name": "tier_match",
+        "ok": false,
+        "detail": "expected mid|deep got "
+      },
+      {
+        "name": "required_tool:analyze_allocation",
+        "ok": false,
+        "detail": "missing; got []"
+      },
+      {
+        "name": "answer_forbidden:buy more of",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:i recommend selling",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [],
+    "tier": "",
+    "toolsCalled": [],
+    "answer": null,
+    "latencyMs": 7,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "dining-spend-no-plaid-data",
+      "description": "Dining spend asked when Plaid transaction table is empty. Agent should honestly acknowledge missing data, not fabricate a number.",
+      "user_turns": [
+        "How much have I been spending on dining out lately?"
+      ],
+      "expected": {
+        "specialists": [
+          "spending-coach"
+        ],
+        "tier": [
+          "fast",
+          "mid"
+        ],
+        "required_tools_called": [],
+        "forbidden_tools_called": [
+          "save_user_fact"
+        ],
+        "answer_must_not_contain": [
+          "$"
+        ],
+        "max_tool_calls_total": 4
+      }
+    },
+    "ok": false,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": false,
+        "detail": "got 401: {\"error\":\"Unauthorized\"}"
+      },
+      {
+        "name": "specialists_match",
+        "ok": false,
+        "detail": "expected one of [spending-coach] got []"
+      },
+      {
+        "name": "tier_match",
+        "ok": false,
+        "detail": "expected fast|mid got "
+      },
+      {
+        "name": "forbidden_tool:save_user_fact",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:$",
+        "ok": true
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [],
+    "tier": "",
+    "toolsCalled": [],
+    "answer": null,
+    "latencyMs": 8,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "sabbatical-planning",
+      "description": "Open-ended planning question for a 3-month career pause. Should route to general-advisor at deep tier (cross-domain: savings, spending, goals, timing).",
+      "user_turns": [
+        "I'm thinking about taking a 3-month sabbatical next spring. What should I be thinking about financially to prepare?"
+      ],
+      "expected": {
+        "specialists": [
+          [
+            "general-advisor"
+          ],
+          [
+            "spending-coach",
+            "goal-tracker",
+            "retirement-pacer"
+          ],
+          [
+            "spending-coach",
+            "retirement-pacer"
+          ]
+        ],
+        "tier": [
+          "deep",
+          "mid"
+        ],
+        "forbidden_tools_called": [],
+        "answer_must_not_contain": [
+          "cannot advise",
+          "i'm just an ai"
+        ],
+        "min_bullets": 2,
+        "max_tool_calls_total": 8
+      }
+    },
+    "ok": false,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": false,
+        "detail": "got 401: {\"error\":\"Unauthorized\"}"
+      },
+      {
+        "name": "specialists_match",
+        "ok": false,
+        "detail": "expected one of [general-advisor] | [spending-coach,goal-tracker,retirement-pacer] | [spending-coach,retirement-pacer] got []"
+      },
+      {
+        "name": "tier_match",
+        "ok": false,
+        "detail": "expected deep|mid got "
+      },
+      {
+        "name": "answer_forbidden:cannot advise",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:i'm just an ai",
+        "ok": true
+      },
+      {
+        "name": "min_bullets",
+        "ok": false,
+        "detail": "got 0, expected >= 2"
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [],
+    "tier": "",
+    "toolsCalled": [],
+    "answer": null,
+    "latencyMs": 7,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "pause-401k-for-cash",
+      "description": "Classic multi-domain tradeoff: pause retirement contributions to build cash. Should route to multiple specialists, tier=deep, synthesized answer.",
+      "user_turns": [
+        "Would it be stupid for me to pause my 401k contributions for a few months to build up cash reserves?"
+      ],
+      "expected": {
+        "specialists": [
+          [
+            "retirement-pacer",
+            "goal-tracker"
+          ],
+          [
+            "retirement-pacer",
+            "spending-coach"
+          ],
+          [
+            "retirement-pacer",
+            "goal-tracker",
+            "spending-coach"
+          ]
+        ],
+        "tier": [
+          "deep",
+          "mid"
+        ],
+        "forbidden_tools_called": [],
+        "answer_must_not_contain": [
+          "you should pause",
+          "pause your 401k immediately"
+        ],
+        "min_bullets": 2,
+        "max_tool_calls_total": 10
+      }
+    },
+    "ok": false,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": false,
+        "detail": "got 401: {\"error\":\"Unauthorized\"}"
+      },
+      {
+        "name": "specialists_match",
+        "ok": false,
+        "detail": "expected one of [retirement-pacer,goal-tracker] | [retirement-pacer,spending-coach] | [retirement-pacer,goal-tracker,spending-coach] got []"
+      },
+      {
+        "name": "tier_match",
+        "ok": false,
+        "detail": "expected deep|mid got "
+      },
+      {
+        "name": "answer_forbidden:you should pause",
+        "ok": true
+      },
+      {
+        "name": "answer_forbidden:pause your 401k immediately",
+        "ok": true
+      },
+      {
+        "name": "min_bullets",
+        "ok": false,
+        "detail": "got 0, expected >= 2"
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [],
+    "tier": "",
+    "toolsCalled": [],
+    "answer": null,
+    "latencyMs": 9,
+    "error": null
+  },
+  {
+    "scenario": {
+      "id": "got-married-update-filing-status",
+      "description": "User volunteers a life change. Agent must save it - expect save_user_fact and/or update_profile.",
+      "user_turns": [
+        "Heads up — I got married last month and my wife and I will be filing jointly going forward."
+      ],
+      "expected": {
+        "specialists": [
+          [
+            "tax-planner",
+            "general-advisor"
+          ],
+          [
+            "tax-planner"
+          ],
+          [
+            "goal-tracker",
+            "tax-planner"
+          ],
+          [
+            "tax-planner",
+            "goal-tracker",
+            "general-advisor"
+          ]
+        ],
+        "tier": [
+          "mid",
+          "fast"
+        ],
+        "required_tools_called": [
+          "save_user_fact"
+        ],
+        "forbidden_tools_called": [],
+        "answer_must_contain": [
+          "marr"
+        ],
+        "max_tool_calls_total": 6
+      }
+    },
+    "ok": false,
+    "assertions": [
+      {
+        "name": "http_200",
+        "ok": false,
+        "detail": "got 401: {\"error\":\"Unauthorized\"}"
+      },
+      {
+        "name": "specialists_match",
+        "ok": false,
+        "detail": "expected one of [tax-planner,general-advisor] | [tax-planner] | [goal-tracker,tax-planner] | [tax-planner,goal-tracker,general-advisor] got []"
+      },
+      {
+        "name": "tier_match",
+        "ok": false,
+        "detail": "expected mid|fast got "
+      },
+      {
+        "name": "required_tool:save_user_fact",
+        "ok": false,
+        "detail": "missing; got []"
+      },
+      {
+        "name": "answer_contains:marr",
+        "ok": false,
+        "detail": "answer did not contain \"marr\""
+      },
+      {
+        "name": "max_tool_calls_total",
+        "ok": true
+      }
+    ],
+    "specialists": [],
+    "tier": "",
+    "toolsCalled": [],
+    "answer": null,
+    "latencyMs": 7,
+    "error": null
+  }
+]

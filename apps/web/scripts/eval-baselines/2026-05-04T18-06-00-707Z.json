@@ -1,0 +1,360 @@
+{
+  "ranAt": "2026-05-04T18:06:00.707Z",
+  "baseUrl": "http://localhost:3001",
+  "results": [
+    {
+      "question": {
+        "id": "spending-dining-trend",
+        "message": "Is my dining spending going up or down?",
+        "expectedSpecialists": [
+          "spending-coach"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 59,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "spending-amazon-total",
+        "message": "How much did I spend at Amazon over the last three months?",
+        "expectedSpecialists": [
+          "spending-coach"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 13,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "spending-subscriptions",
+        "message": "Show me my recurring subscriptions.",
+        "expectedSpecialists": [
+          "spending-coach"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 12,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "goal-list-progress",
+        "message": "How am I doing on my goals?",
+        "expectedSpecialists": [
+          "goal-tracker"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 11,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "goal-commit-new",
+        "message": "I want to commit to saving $20,000 for a down payment by the end of 2027.",
+        "expectedSpecialists": [
+          "goal-tracker"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 10,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "portfolio-allocation-overview",
+        "message": "How is my portfolio allocated between retirement and taxable?",
+        "expectedSpecialists": [
+          "portfolio-analyst"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 12,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "portfolio-concentration",
+        "message": "Am I too concentrated in any single holding?",
+        "expectedSpecialists": [
+          "portfolio-analyst"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 10,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "tax-401k-limit",
+        "message": "What is the 401k contribution limit this year and how close am I?",
+        "expectedSpecialists": [
+          "tax-planner"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 11,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "tax-roth-ira-phaseout",
+        "message": "Am I above the Roth IRA phaseout for single filers?",
+        "expectedSpecialists": [
+          "tax-planner"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 10,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "retirement-pacing",
+        "message": "Am I on pace for retirement given my age?",
+        "expectedSpecialists": [
+          "retirement-pacer"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 14,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "retirement-catchup",
+        "message": "Should I think about catchup contributions yet?",
+        "expectedSpecialists": [
+          "retirement-pacer"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 11,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "general-overall",
+        "message": "How am I doing overall?",
+        "expectedSpecialists": [
+          "general-advisor"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 16,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "general-fuzzy",
+        "message": "Give me a quick snapshot of where things stand.",
+        "expectedSpecialists": [
+          "general-advisor"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 13,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "multi-retirement-tax",
+        "message": "Am I contributing too much to my 401k? How close am I to the IRS limit?",
+        "expectedSpecialists": [
+          "tax-planner",
+          "retirement-pacer"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 13,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "multi-spending-goal",
+        "message": "I want to cut my dining spending in half and track that as a goal.",
+        "expectedSpecialists": [
+          "spending-coach",
+          "goal-tracker"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 52,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "multi-portfolio-retirement",
+        "message": "Is my retirement allocation aggressive enough for someone my age?",
+        "expectedSpecialists": [
+          "portfolio-analyst",
+          "retirement-pacer"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 8,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    },
+    {
+      "question": {
+        "id": "multi-full-sweep",
+        "message": "Look at my spending, retirement, and portfolio together and tell me what to focus on.",
+        "expectedSpecialists": [
+          "spending-coach",
+          "portfolio-analyst",
+          "retirement-pacer"
+        ]
+      },
+      "ok": false,
+      "error": "HTTP 401: Unauthorized",
+      "routerCorrect": false,
+      "specialistsInvoked": [],
+      "synthesized": false,
+      "latencyMs": 14,
+      "answer": null,
+      "answerContainsAll": null,
+      "toolCallTotals": {},
+      "specialistsOk": {},
+      "stoppedReasons": {}
+    }
+  ],
+  "summary": {
+    "total": 17,
+    "routerCorrectCount": 0,
+    "routerAccuracyPercent": 0,
+    "allAnsweredCount": 0,
+    "anyFailedCount": 17,
+    "multiDomainSynthesizedCount": 0,
+    "avgLatencyMs": 17
+  }
+}

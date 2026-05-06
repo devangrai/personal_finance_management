@@ -1,0 +1,14 @@
+id: "sabbatical-planning"
+description: "Open-ended planning question for a 3-month career pause. Should route to general-advisor at deep tier (cross-domain: savings, spending, goals, timing)."
+user_turns:
+  - "I'm thinking about taking a 3-month sabbatical next spring. What should I be thinking about financially to prepare?"
+expected:
+  specialists:
+    - ["general-advisor"]
+    - ["spending-coach", "goal-tracker", "retirement-pacer"]
+    - ["spending-coach", "retirement-pacer"]
+  tier: ["deep", "mid"]
+  forbidden_tools_called: []
+  answer_must_not_contain: ["cannot advise", "i'm just an ai"]
+  min_bullets: 2
+  max_tool_calls_total: 8

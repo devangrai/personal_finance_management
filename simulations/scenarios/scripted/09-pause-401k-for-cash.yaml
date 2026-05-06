@@ -1,0 +1,14 @@
+id: "pause-401k-for-cash"
+description: "Classic multi-domain tradeoff: pause retirement contributions to build cash. Should route to multiple specialists, tier=deep, synthesized answer."
+user_turns:
+  - "Would it be stupid for me to pause my 401k contributions for a few months to build up cash reserves?"
+expected:
+  specialists:
+    - ["retirement-pacer", "goal-tracker"]
+    - ["retirement-pacer", "spending-coach"]
+    - ["retirement-pacer", "goal-tracker", "spending-coach"]
+  tier: ["deep", "mid"]
+  forbidden_tools_called: []
+  answer_must_not_contain: ["you should pause", "pause your 401k immediately"]
+  min_bullets: 2
+  max_tool_calls_total: 10

@@ -1,0 +1,12 @@
+id: "irs-401k-limit-lookup"
+description: "Simple IRS limit lookup. Should route to tax-planner at fast tier, call get_irs_limits, quote $24,000."
+user_turns:
+  - "Quick one — what's the 401k contribution limit for this year?"
+expected:
+  specialists: ["tax-planner"]
+  tier: ["fast", "mid"]
+  required_tools_called: ["get_irs_limits"]
+  forbidden_tools_called: ["save_user_fact", "save_user_goal", "update_profile"]
+  answer_must_contain: ["24"]
+  answer_must_not_contain: ["recommend you should", "we should file"]
+  max_tool_calls_total: 3

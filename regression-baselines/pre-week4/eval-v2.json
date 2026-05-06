@@ -1,0 +1,10 @@
+{
+  "name": "eval-v2",
+  "passed": 3,
+  "total": 6,
+  "metric": "regression pass^k",
+  "meta": {
+    "capability": "1/4",
+    "routerPercent": 50
+  }
+}

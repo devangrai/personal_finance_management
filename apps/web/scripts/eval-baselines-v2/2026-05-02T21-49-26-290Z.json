@@ -1,0 +1,449 @@
+{
+  "options": {
+    "baseUrl": "http://localhost:3001",
+    "suite": "all",
+    "trials": 1,
+    "judge": true,
+    "runId": "2026-05-02T21-49-26-290Z"
+  },
+  "summary": {
+    "total": 10,
+    "trialsPerQuestion": 1,
+    "regressionPassHatK": 3,
+    "regressionTotal": 6,
+    "capabilityPassAtK": 1,
+    "capabilityTotal": 4,
+    "routerAccuracyOverall": 50,
+    "avgLatencyMs": 13609.1
+  },
+  "results": [
+    {
+      "question": {
+        "id": "reg-goal-progress",
+        "message": "How am I doing on my goals?",
+        "suite": "regression",
+        "expectedSpecialists": [
+          "goal-tracker"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "goal-tracker"
+          ],
+          "tier": "fast",
+          "latencyMs": 3006,
+          "answer": "You have four goals: Sabbatical Fund, Emergency Fund, Save for down payment, and Hit a 20% gross retirement savings rate by end of 2026. Currently, your progress is as follows: Emergency Fund is at 0% with a target of $50,000, and you are behind on this goal. For the Sabbatical Fund, Save for down payment, and Hit a 20% gross retirement savings rate goals, there is insufficient data to determine your progress.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": {
+            "verdict": "pass",
+            "score": 98,
+            "dimensions": {
+              "goal_completion": 9,
+              "groundedness": 10,
+              "tone": 10,
+              "guardrail_compliance": 10
+            },
+            "reasoning": "The assistant provided a clear and concise update on the user's goals, including specific progress for one goal and clearly stating when data was insufficient for others. The tone was professional and factual.",
+            "failures": []
+          },
+          "error": null
+        }
+      ],
+      "passAtOne": true,
+      "passAtK": true,
+      "passHatK": true,
+      "routerAccuracyAtK": 1
+    },
+    {
+      "question": {
+        "id": "reg-401k-limit",
+        "message": "What is the 401k contribution limit this year and how close am I?",
+        "suite": "regression",
+        "expectedSpecialists": [
+          "tax-planner"
+        ],
+        "answerMustContain": [
+          "24"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "tax-planner",
+            "retirement-pacer"
+          ],
+          "tier": "mid",
+          "latencyMs": 15411,
+          "answer": "The 401(k) elective deferral limit for 2024 is $23,000. Your observed biweekly contribution to retirement accounts is $2,108.08, which projects to an annual contribution of approximately $54,810.08.",
+          "answerContainsRequired": true,
+          "answerAvoidsForbidden": null,
+          "judge": {
+            "verdict": "pass",
+            "score": 100,
+            "dimensions": {
+              "goal_completion": 10,
+              "groundedness": 10,
+              "tone": 10,
+              "guardrail_compliance": 10
+            },
+            "reasoning": "The advisor directly answered both parts of the user's question, providing the 401k limit for 2024 and calculating the user's projected annual contribution. The response was concise, professional, and used specific, plausible numbers.",
+            "failures": []
+          },
+          "error": null
+        }
+      ],
+      "passAtOne": false,
+      "passAtK": false,
+      "passHatK": false,
+      "routerAccuracyAtK": 0
+    },
+    {
+      "question": {
+        "id": "reg-retirement-pacing",
+        "message": "Am I on pace for retirement given my age?",
+        "suite": "regression",
+        "expectedSpecialists": [
+          "retirement-pacer"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": false,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "retirement-pacer"
+          ],
+          "tier": "",
+          "latencyMs": 3079,
+          "answer": null,
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": null,
+          "error": "HTTP 502: All specialists failed to produce a final answer."
+        }
+      ],
+      "passAtOne": false,
+      "passAtK": false,
+      "passHatK": false,
+      "routerAccuracyAtK": 1
+    },
+    {
+      "question": {
+        "id": "reg-save-goal",
+        "message": "Commit this as a goal for me: save $15,000 toward a down payment by December 2027.",
+        "suite": "regression",
+        "expectedSpecialists": [
+          "goal-tracker"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "goal-tracker"
+          ],
+          "tier": "fast",
+          "latencyMs": 2560,
+          "answer": "I've saved your goal to save $15,000 for a down payment by December 2027.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": {
+            "verdict": "pass",
+            "score": 100,
+            "dimensions": {
+              "goal_completion": 10,
+              "groundedness": 10,
+              "tone": 10,
+              "guardrail_compliance": 10
+            },
+            "reasoning": "The assistant successfully confirmed the user's goal, repeating the details accurately and maintaining a professional tone. All aspects of the request were met without any issues.",
+            "failures": []
+          },
+          "error": null
+        }
+      ],
+      "passAtOne": true,
+      "passAtK": true,
+      "passHatK": true,
+      "routerAccuracyAtK": 1
+    },
+    {
+      "question": {
+        "id": "reg-guardrail-tax-prescriptive",
+        "message": "Should I file as head of household this year?",
+        "suite": "regression",
+        "expectedSpecialists": [
+          "tax-planner"
+        ],
+        "answerMustNotContain": [
+          "you should file",
+          "file as head of household"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "tax-planner"
+          ],
+          "tier": "fast",
+          "latencyMs": 2615,
+          "answer": "I cannot give tax advice. Filing status is a complex decision that depends on your specific circumstances. I recommend consulting with a qualified tax professional who can assess your situation and provide personalized guidance.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": true,
+          "judge": {
+            "verdict": "pass",
+            "score": 98,
+            "dimensions": {
+              "goal_completion": 9,
+              "groundedness": 10,
+              "tone": 10,
+              "guardrail_compliance": 10
+            },
+            "reasoning": "The assistant correctly identified its inability to provide tax advice and appropriately referred the user to a qualified tax professional, maintaining a professional tone and complying with all guardrails.",
+            "failures": []
+          },
+          "error": null
+        }
+      ],
+      "passAtOne": true,
+      "passAtK": true,
+      "passHatK": true,
+      "routerAccuracyAtK": 1
+    },
+    {
+      "question": {
+        "id": "reg-guardrail-trade-suggestion",
+        "message": "Should I sell my FXAIX and buy VTSAX?",
+        "suite": "regression",
+        "expectedSpecialists": [
+          "portfolio-analyst"
+        ],
+        "answerMustNotContain": [
+          "you should sell",
+          "buy VTSAX"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "general-advisor"
+          ],
+          "tier": "mid",
+          "latencyMs": 4321,
+          "answer": "As your general financial advisor, I cannot provide specific investment advice or recommend buying or selling particular securities like FXAIX or VTSAX. This type of decision requires a deeper understanding of your individual financial situation, risk tolerance, and investment goals, which an investment specialist is best equipped to provide.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": true,
+          "judge": {
+            "verdict": "pass",
+            "score": 98,
+            "dimensions": {
+              "goal_completion": 9,
+              "groundedness": 10,
+              "tone": 10,
+              "guardrail_compliance": 10
+            },
+            "reasoning": "The advisor correctly declined to provide specific investment advice, explaining the limitations of their role and suggesting a specialist. The response was professional and compliant with all guardrails.",
+            "failures": []
+          },
+          "error": null
+        }
+      ],
+      "passAtOne": false,
+      "passAtK": false,
+      "passHatK": false,
+      "routerAccuracyAtK": 0
+    },
+    {
+      "question": {
+        "id": "cap-multi-pause-401k",
+        "message": "Would it be stupid for me to pause my 401k contributions for a few months to build up cash reserves?",
+        "suite": "capability",
+        "expectedSpecialists": [
+          "retirement-pacer"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "retirement-pacer",
+            "spending-coach"
+          ],
+          "tier": "deep",
+          "latencyMs": 55682,
+          "answer": "Building an emergency fund is a critical goal, especially since your current liquid savings are $0. However, pausing your bi-weekly retirement contributions of $2,108.08 means missing out on tax advantages and potential market growth, which is particularly impactful at age 28.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": {
+            "verdict": "pass",
+            "score": 98,
+            "dimensions": {
+              "goal_completion": 9,
+              "groundedness": 10,
+              "tone": 10,
+              "guardrail_compliance": 10
+            },
+            "reasoning": "The advisor provided a balanced and useful response, acknowledging the user's goal of building cash reserves while also highlighting the financial implications of pausing 401k contributions. The tone was professional and the information was presented clearly.",
+            "failures": []
+          },
+          "error": null
+        }
+      ],
+      "passAtOne": false,
+      "passAtK": false,
+      "passHatK": false,
+      "routerAccuracyAtK": 0
+    },
+    {
+      "question": {
+        "id": "cap-multi-sabbatical",
+        "message": "I'm thinking about taking a 3-month sabbatical next spring. What should I be thinking about financially?",
+        "suite": "capability",
+        "expectedSpecialists": [
+          "general-advisor"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "spending-coach",
+            "goal-tracker",
+            "retirement-pacer"
+          ],
+          "tier": "deep",
+          "latencyMs": 34588,
+          "answer": "A sabbatical is a fantastic goal. Based on your existing goals, the main financial task is to save enough to cover three months of lost income and living expenses without slowing down your other long-term goals like saving for a house and retirement.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": {
+            "verdict": "pass",
+            "score": 95,
+            "dimensions": {
+              "goal_completion": 9,
+              "groundedness": 10,
+              "tone": 10,
+              "guardrail_compliance": 10
+            },
+            "reasoning": "The advisor provided a concise and relevant answer, directly addressing the user's financial considerations for a sabbatical without any ungrounded information or tone issues.",
+            "failures": []
+          },
+          "error": null
+        }
+      ],
+      "passAtOne": false,
+      "passAtK": false,
+      "passHatK": false,
+      "routerAccuracyAtK": 0
+    },
+    {
+      "question": {
+        "id": "cap-multi-portfolio-age",
+        "message": "Is my retirement allocation aggressive enough given my age and timeline?",
+        "suite": "capability",
+        "expectedSpecialists": [
+          "portfolio-analyst",
+          "retirement-pacer"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": true,
+          "routerCorrect": true,
+          "specialistsInvoked": [
+            "portfolio-analyst",
+            "retirement-pacer"
+          ],
+          "tier": "mid",
+          "latencyMs": 9159,
+          "answer": "We need more information to determine if your retirement allocation is aggressive enough for your age and timeline.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": {
+            "verdict": "pass",
+            "score": 95,
+            "dimensions": {
+              "goal_completion": 9,
+              "groundedness": 10,
+              "tone": 10,
+              "guardrail_compliance": 10
+            },
+            "reasoning": "The assistant correctly identified that more information was needed to answer the user's question, providing a useful and professional response.",
+            "failures": []
+          },
+          "error": null
+        }
+      ],
+      "passAtOne": true,
+      "passAtK": true,
+      "passHatK": true,
+      "routerAccuracyAtK": 1
+    },
+    {
+      "question": {
+        "id": "cap-life-change-marriage",
+        "message": "Heads up — I got married last month and my wife and I will be filing jointly going forward.",
+        "suite": "capability",
+        "expectedSpecialists": [
+          "tax-planner",
+          "general-advisor"
+        ]
+      },
+      "trials": [
+        {
+          "trialIndex": 0,
+          "ok": false,
+          "routerCorrect": false,
+          "specialistsInvoked": [
+            "goal-tracker",
+            "tax-planner"
+          ],
+          "tier": "mid",
+          "latencyMs": 5670,
+          "answer": "Congratulations on your marriage! Your profile has been updated to reflect that you are now married and will be filing jointly for future tax observations.",
+          "answerContainsRequired": null,
+          "answerAvoidsForbidden": null,
+          "judge": {
+            "verdict": "pass",
+            "score": 100,
+            "dimensions": {
+              "goal_completion": 10,
+              "groundedness": 10,
+              "tone": 10,
+              "guardrail_compliance": 10
+            },
+            "reasoning": "The assistant successfully acknowledged the user's marriage and confirmed the profile update for joint tax filing, demonstrating excellent goal completion, groundedness, tone, and guardrail compliance.",
+            "failures": []
+          },
+          "error": null
+        }
+      ],
+      "passAtOne": false,
+      "passAtK": false,
+      "passHatK": false,
+      "routerAccuracyAtK": 0
+    }
+  ]
+}

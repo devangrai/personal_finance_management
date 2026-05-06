@@ -1,0 +1,28 @@
+{
+  "source": "fidelity_csv",
+  "defaultCurrency": "USD",
+  "imports": [
+    {
+      "fileName": "History_for_Account_XXXXXXX.csv",
+      "importKind": "transactions",
+      "accountName": "Roth IRA",
+      "accountSubtype": "roth_ira",
+      "bucket": "retirement"
+    },
+    {
+      "fileName": "History_for_Account_YYYYYYY.csv",
+      "importKind": "transactions",
+      "accountName": "Individual Brokerage",
+      "accountSubtype": "brokerage",
+      "bucket": "taxable"
+    },
+    {
+      "fileName": "Holdings_for_Account_YYYYYYY.csv",
+      "importKind": "holdings",
+      "accountName": "Individual Brokerage",
+      "accountSubtype": "brokerage",
+      "bucket": "taxable",
+      "asOfDate": "2026-05-01"
+    }
+  ]
+}

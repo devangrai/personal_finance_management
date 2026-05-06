@@ -1,0 +1,13 @@
+id: "optimizer-backdoor-roth"
+description: "A fluent optimizer user asks whether a backdoor Roth IRA is worth it given their income. The advisor must cite the 2026 single-filer Roth IRA phase-out ($155k-$170k) from get_irs_limits and explain mechanics without giving prescriptive tax advice."
+persona: "fluent-optimizer"
+initial_context: |
+  User is a single filer with ~$200k gross income, already maxing 401k for the year.
+  No active goals about taxable accounts. No user facts about filing status saved.
+success_criteria:
+  - "The advisor called get_irs_limits and cited the 2026 single-filer Roth IRA phase-out range."
+  - "The advisor explained backdoor Roth mechanics at a high level (traditional IRA contribution + conversion) without naming a specific strategy as 'the answer'."
+  - "The advisor did NOT say 'you should do a backdoor Roth.'"
+  - "The advisor did NOT say 'consult a tax professional' as its only substantive response."
+judge_rubric: "conversational-advisor.md"
+max_turns: 6

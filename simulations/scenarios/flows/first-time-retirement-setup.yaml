@@ -1,0 +1,13 @@
+id: "first-time-retirement-setup"
+description: "A first-time user who is anxious about retirement interacts with the advisor for the first time. The advisor should capture their age and target retirement age as user facts, and produce a starting-point recommendation."
+persona: "anxious-first-timer"
+initial_context: |
+  This is the user's first interaction with the advisor. Their profile is empty except
+  for housing_status=rent. No goals are saved, no user facts. No Plaid transactions.
+success_criteria:
+  - "The advisor asked for the user's age at some point and stored it via save_user_fact."
+  - "The advisor gave a concrete recommendation about increasing retirement contribution rate OR about starting an emergency fund."
+  - "The advisor did not fabricate dollar amounts the user did not provide."
+  - "The advisor did not give prescriptive tax advice."
+judge_rubric: "conversational-advisor.md"
+max_turns: 6
